@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="900">
+<title>{{ site_name }} — Battery SOC</title>
+<style>
+  :root {
+    --bg: #101418;
+    --panel: #1a2028;
+    --panel-border: #262e38;
+    --text: #e8edf2;
+    --muted: #8a96a3;
+    --green: #22c55e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --grey: #4b5563;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    text-align: center;
+    padding: 24px 16px 8px;
+  }
+  header h1 {
+    margin: 0; font-size: clamp(20px, 4vw, 36px); font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  header .subtitle {
+    color: var(--muted); font-size: clamp(12px, 1.6vw, 15px);
+    margin-top: 6px;
+  }
+  main {
+    display: flex; flex-wrap: wrap; gap: 24px;
+    justify-content: center; align-items: stretch;
+    padding: 24px 16px 32px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 18px;
+    padding: 28px 24px;
+    width: min(420px, 92vw);
+    text-align: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .card.stale { opacity: 0.55; }
+  .device-name {
+    font-size: clamp(18px, 2.4vw, 22px);
+    color: var(--muted); margin: 0 0 18px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .light {
+    width: clamp(180px, 30vw, 240px); height: clamp(180px, 30vw, 240px);
+    border-radius: 50%;
+    margin: 0 auto;
+    background: var(--grey);
+    box-shadow: 0 0 0 8px rgba(255,255,255,0.04),
+                inset 0 -10px 30px rgba(0,0,0,0.45);
+    transition: background 0.3s ease, box-shadow 0.3s ease;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .light .soc {
+    font-size: clamp(36px, 8vw, 64px);
+    font-weight: 700;
+    color: rgba(0,0,0,0.78);
+    text-shadow: 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .light.green  { background: radial-gradient(circle at 30% 30%, #4ade80, var(--green)); box-shadow: 0 0 32px rgba(34,197,94,0.55), inset 0 -10px 30px rgba(0,0,0,0.4); }
+  .light.orange { background: radial-gradient(circle at 30% 30%, #fbbf24, var(--orange)); box-shadow: 0 0 32px rgba(245,158,11,0.55), inset 0 -10px 30px rgba(0,0,0,0.4); }
+  .light.red    { background: radial-gradient(circle at 30% 30%, #f87171, var(--red));    box-shadow: 0 0 32px rgba(239,68,68,0.55),  inset 0 -10px 30px rgba(0,0,0,0.4); }
+  .light.unknown { background: var(--grey); }
+  .power {
+    margin-top: 22px;
+    font-size: clamp(18px, 2.4vw, 24px);
+    min-height: 1.5em;
+  }
+  .power .arrow {
+    display: inline-block;
+    margin-right: 6px;
+    font-weight: 700;
+  }
+  .power.charging   .arrow { color: var(--green); }
+  .power.discharging .arrow { color: var(--orange); }
+  .power.idle       .arrow { color: var(--muted); }
+  .power .label { color: var(--muted); margin-left: 6px; font-size: 0.85em; }
+  .timestamp {
+    margin-top: 14px; color: var(--muted);
+    font-size: clamp(11px, 1.4vw, 13px); font-variant-numeric: tabular-nums;
+  }
+  .offline-banner {
+    background: var(--red); color: white; text-align: center;
+    padding: 10px; font-weight: 600; letter-spacing: 0.5px;
+    display: none;
+  }
+  .offline-banner.show { display: block; }
+  footer {
+    text-align: center; padding: 16px;
+    color: var(--muted); font-size: 12px;
+  }
+  .legend {
+    display: flex; gap: 18px; justify-content: center; flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .legend span {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .legend i {
+    width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+  }
+  .legend .g { background: var(--green); }
+  .legend .o { background: var(--orange); }
+  .legend .r { background: var(--red); }
+</style>
+</head>
+<body>
+
+<div id="offline-banner" class="offline-banner">⚠ Lost contact with monitoring system</div>
+
+<header>
+  <h1>{{ site_name }} — Battery State of Charge</h1>
+  <div class="subtitle">
+    Green ≥{{ green_min }}% &nbsp;·&nbsp; Orange {{ orange_min }}–{{ green_min }}% &nbsp;·&nbsp; Red &lt;{{ orange_min }}%
+  </div>
+</header>
+
+<main>
+  <section class="card" id="card-sppro">
+    <p class="device-name">SP Pro</p>
+    <div class="light unknown" id="light-sppro"><div class="soc" id="soc-sppro">—</div></div>
+    <div class="power idle" id="power-sppro"><span class="arrow">·</span><span id="power-val-sppro">—</span><span class="label">battery</span></div>
+    <div class="timestamp" id="ts-sppro">waiting for data…</div>
+  </section>
+
+  <section class="card" id="card-solis">
+    <p class="device-name">Solis</p>
+    <div class="light unknown" id="light-solis"><div class="soc" id="soc-solis">—</div></div>
+    <div class="power idle" id="power-solis"><span class="arrow">·</span><span id="power-val-solis">—</span><span class="label">battery</span></div>
+    <div class="timestamp" id="ts-solis">waiting for data…</div>
+  </section>
+</main>
+
+<footer>
+  <div class="legend">
+    <span><i class="g"></i> Green ≥{{ green_min }}%</span>
+    <span><i class="o"></i> Orange {{ orange_min }}–{{ green_min }}%</span>
+    <span><i class="r"></i> Red &lt;{{ orange_min }}%</span>
+  </div>
+  <div style="margin-top:6px;">Auto-refreshes every 5 s — page reloads every 15 min as a backstop.</div>
+</footer>
+
+<script>
+(function () {
+  const POLL_MS = 5000;
+  const STALE_AFTER_MS = 60 * 1000;     // dim a device whose data hasn't moved in 60 s
+  const WATCHDOG_MS    = 120 * 1000;    // force-reload page if no successful fetch in 2 min
+
+  let lastSuccessfulFetch = Date.now();
+
+  function fmtPower(w) {
+    if (w === null || w === undefined || isNaN(w)) return "—";
+    const kw = w / 1000;
+    return Math.abs(kw).toFixed(2) + " kW";
+  }
+
+  function fmtAge(iso) {
+    if (!iso) return "—";
+    const t = new Date(iso).getTime();
+    if (isNaN(t)) return "—";
+    const ageSec = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (ageSec < 60) return ageSec + "s ago";
+    if (ageSec < 3600) return Math.round(ageSec / 60) + "m ago";
+    return Math.round(ageSec / 3600) + "h ago";
+  }
+
+  function renderDevice(key, dev) {
+    const card  = document.getElementById("card-" + key);
+    const light = document.getElementById("light-" + key);
+    const soc   = document.getElementById("soc-" + key);
+    const power = document.getElementById("power-" + key);
+    const pval  = document.getElementById("power-val-" + key);
+    const ts    = document.getElementById("ts-" + key);
+
+    // Light + SOC number
+    light.classList.remove("green", "orange", "red", "unknown");
+    light.classList.add(dev.status || "unknown");
+    soc.textContent = (dev.soc === null || dev.soc === undefined)
+      ? "—"
+      : Math.round(dev.soc) + "%";
+
+    // Battery power
+    power.classList.remove("charging", "discharging", "idle");
+    const arrow = power.querySelector(".arrow");
+    if (dev.power_w === null || dev.power_w === undefined || isNaN(dev.power_w)) {
+      power.classList.add("idle");
+      arrow.textContent = "·";
+      pval.textContent = "—";
+    } else if (dev.power_w > 50) {            // charging
+      power.classList.add("charging");
+      arrow.textContent = "▲";
+      pval.textContent = fmtPower(dev.power_w) + " charging";
+    } else if (dev.power_w < -50) {           // discharging
+      power.classList.add("discharging");
+      arrow.textContent = "▼";
+      pval.textContent = fmtPower(dev.power_w) + " discharging";
+    } else {
+      power.classList.add("idle");
+      arrow.textContent = "·";
+      pval.textContent = "idle (" + fmtPower(dev.power_w) + ")";
+    }
+
+    // Timestamp + staleness
+    const stampStr = dev.fetched_at || dev.polled_at;
+    let stale = false;
+    if (stampStr) {
+      const stampMs = new Date(stampStr).getTime();
+      stale = !isNaN(stampMs) && (Date.now() - stampMs) > STALE_AFTER_MS;
+    } else {
+      stale = true;
+    }
+    card.classList.toggle("stale", stale || !dev.online);
+
+    if (dev.error) {
+      ts.textContent = "error: " + dev.error;
+    } else if (!dev.online && dev.soc === null) {
+      ts.textContent = "no data from upstream";
+    } else {
+      ts.textContent = "updated " + fmtAge(stampStr);
+    }
+  }
+
+  async function refresh() {
+    try {
+      const r = await fetch("/api/soc?_=" + Date.now(), { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const data = await r.json();
+      renderDevice("sppro", data.devices.sppro);
+      renderDevice("solis", data.devices.solis);
+
+      const allOk = data.devices.sppro.online || data.devices.solis.online;
+      document.getElementById("offline-banner").classList.toggle("show", !allOk);
+
+      lastSuccessfulFetch = Date.now();
+    } catch (e) {
+      console.warn("refresh failed:", e);
+      document.getElementById("offline-banner").classList.add("show");
+    }
+  }
+
+  // Watchdog — if we go too long without a successful fetch, reload the page
+  setInterval(() => {
+    if (Date.now() - lastSuccessfulFetch > WATCHDOG_MS) {
+      console.warn("Watchdog: no successful fetch in " + WATCHDOG_MS + "ms — reloading");
+      location.reload();
+    }
+  }, 10000);
+
+  refresh();
+  setInterval(refresh, POLL_MS);
+})();
+</script>
+</body>
+</html>

@@ -69,7 +69,7 @@ class Config:
     request_timeout = 4  # seconds per upstream HTTP call
     green_min = 70
     orange_min = 40
-    site_name = "Mooramoora"
+    site_name = "Wombat Hollow Microgrid"
 
 
 CONFIG = Config()
@@ -83,6 +83,15 @@ class UpstreamPoller:
     and caches the latest decoded SOC + power per inverter."""
 
     DEVICES = ("sppro", "solis")
+
+    # Upstream paths to try for each device, in order. Falls back to the
+    # next path if the previous returns 404. Earlier versions of
+    # microgrid_remote_monitor only had the legacy /api/data route for
+    # Solis (no /api/solis/data), hence the fallback.
+    DEVICE_PATHS = {
+        "sppro": ("/api/sppro/data",),
+        "solis": ("/api/solis/data", "/api/data"),
+    }
 
     def __init__(self, upstream: str, poll_interval: int, request_timeout: int):
         self.upstream = upstream.rstrip("/")
@@ -105,36 +114,72 @@ class UpstreamPoller:
         }
 
     def _fetch_one(self, device: str) -> dict:
-        url = f"{self.upstream}/api/{device}/data"
-        try:
-            r = requests.get(url, timeout=self.request_timeout)
-            r.raise_for_status()
-            payload = r.json()
-        except Exception as e:
+        paths = self.DEVICE_PATHS.get(device, (f"/api/{device}/data",))
+        payload = None
+        last_error = None
+        for path in paths:
+            url = f"{self.upstream}{path}"
+            try:
+                r = requests.get(url, timeout=self.request_timeout)
+                # On 404, transparently fall through to the next path
+                if r.status_code == 404:
+                    last_error = f"HTTP 404 at {path}"
+                    continue
+                r.raise_for_status()
+                payload = r.json()
+                last_error = None
+                break
+            except Exception as e:
+                last_error = f"{type(e).__name__}: {e}"
+                # On any non-404 error don't keep retrying alternate paths —
+                # they're almost certainly the same network problem.
+                break
+        if payload is None:
             return {**self._empty_state(),
                     "polled_at": datetime.now(timezone.utc).isoformat(),
-                    "error": f"{type(e).__name__}: {e}"}
+                    "error": last_error or "no payload"}
 
         # The Solis/SP Pro endpoints return a flat dict keyed by register name.
         # `battery_soc` is %, `battery_power` is W (signed: + charge, - discharge).
         soc = payload.get("battery_soc")
+
+        # Solis has two batteries — average their SOCs so the light reflects
+        # overall pack state rather than just battery 1.
+        #   - battery 1 SOC: battery_soc
+        #   - battery 2 SOC: bms2_battery_soc  (different field naming on the
+        #                                       Solis selpi-style reader)
+        if device == "solis":
+            b2_soc = payload.get("bms2_battery_soc")
+            if b2_soc is not None and soc is not None:
+                soc = (float(soc) + float(b2_soc)) / 2.0
+
         power = payload.get("battery_power")
-        # Some SP Pro variants expose kW instead of W under a different key —
-        # be defensive.
+        # Different readers expose battery power under different keys:
+        #   - Solis Modbus reader:  battery_power  (W, signed: + charge, - discharge)
+        #   - SP Pro selpi reader:  battery_w      (W, signed: + charge, - discharge)
+        # Be defensive — check the common variants in priority order.
         if power is None:
-            for alt in ("battery_power_kw", "batt_power", "battery_power_w"):
+            for alt in ("battery_w", "battery_power_w",
+                        "batt_power", "battery_power_kw"):
                 if alt in payload:
                     power = payload[alt]
                     if alt == "battery_power_kw":
                         power = power * 1000.0
                     break
 
+        # `online` was previously taken from the upstream `_read_ok` flag,
+        # but rubberduck's Solis reader sets _read_ok=False on *any* failed
+        # register batch, even when the previous SOC value is still in the
+        # dict and valid. With ~5% batch failure that flapped the banner
+        # constantly. Use "do we have a SOC number" as the online signal
+        # instead — the dashboard JS already handles staleness separately
+        # via the polled_at freshness check.
         return {
             "soc": float(soc) if soc is not None else None,
             "power_w": float(power) if power is not None else None,
             "fetched_at": payload.get("_timestamp"),
             "polled_at": datetime.now(timezone.utc).isoformat(),
-            "online": payload.get("_read_ok", soc is not None),
+            "online": soc is not None,
             "error": None,
         }
 
@@ -260,7 +305,7 @@ def main():
                         help="SOC %% at which light goes green (default: 70)")
     parser.add_argument("--orange-min", type=int, default=40,
                         help="SOC %% at which light goes orange (default: 40)")
-    parser.add_argument("--site-name", default="Mooramoora",
+    parser.add_argument("--site-name", default="Wombat Hollow Microgrid",
                         help="Site name shown in the header (default: Mooramoora)")
     parser.add_argument("--debug", action="store_true",
                         help="Flask debug mode")

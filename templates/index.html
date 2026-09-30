@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="900">
-<title>{{ site_name }} — Battery SOC</title>
+<title>{{ site_name }} — Battery State of Charge</title>
 <style>
   :root {
     --bg: #101418;
@@ -15,7 +15,7 @@
     --green: #22c55e;
     --orange: #f59e0b;
     --red: #ef4444;
-    --grey: #4b5563;
+    --grey: #2a323d;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -26,98 +26,166 @@
   }
   header {
     text-align: center;
-    padding: 24px 16px 8px;
+    padding: 28px 16px 8px;
   }
   header h1 {
-    margin: 0; font-size: clamp(20px, 4vw, 36px); font-weight: 600;
+    margin: 0; font-size: clamp(22px, 4vw, 36px); font-weight: 600;
     letter-spacing: 0.3px;
   }
   header .subtitle {
-    color: var(--muted); font-size: clamp(12px, 1.6vw, 15px);
+    color: var(--muted); font-size: clamp(12px, 1.6vw, 14px);
     margin-top: 6px;
   }
-  main {
-    display: flex; flex-wrap: wrap; gap: 24px;
-    justify-content: center; align-items: stretch;
-    padding: 24px 16px 32px;
-  }
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--panel-border);
-    border-radius: 18px;
-    padding: 28px 24px;
-    width: min(420px, 92vw);
-    text-align: center;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
-  }
-  .card.stale { opacity: 0.55; }
-  .device-name {
-    font-size: clamp(18px, 2.4vw, 22px);
-    color: var(--muted); margin: 0 0 18px;
-    text-transform: uppercase; letter-spacing: 1px;
-  }
-  .light {
-    width: clamp(180px, 30vw, 240px); height: clamp(180px, 30vw, 240px);
-    border-radius: 50%;
-    margin: 0 auto;
-    background: var(--grey);
-    box-shadow: 0 0 0 8px rgba(255,255,255,0.04),
-                inset 0 -10px 30px rgba(0,0,0,0.45);
-    transition: background 0.3s ease, box-shadow 0.3s ease;
-    display: flex; align-items: center; justify-content: center;
-    position: relative;
-  }
-  .light .soc {
-    font-size: clamp(36px, 8vw, 64px);
-    font-weight: 700;
-    color: rgba(0,0,0,0.78);
-    text-shadow: 0 1px 0 rgba(255,255,255,0.25);
-  }
-  .light.green  { background: radial-gradient(circle at 30% 30%, #4ade80, var(--green)); box-shadow: 0 0 32px rgba(34,197,94,0.55), inset 0 -10px 30px rgba(0,0,0,0.4); }
-  .light.orange { background: radial-gradient(circle at 30% 30%, #fbbf24, var(--orange)); box-shadow: 0 0 32px rgba(245,158,11,0.55), inset 0 -10px 30px rgba(0,0,0,0.4); }
-  .light.red    { background: radial-gradient(circle at 30% 30%, #f87171, var(--red));    box-shadow: 0 0 32px rgba(239,68,68,0.55),  inset 0 -10px 30px rgba(0,0,0,0.4); }
-  .light.unknown { background: var(--grey); }
-  .power {
-    margin-top: 22px;
-    font-size: clamp(18px, 2.4vw, 24px);
-    min-height: 1.5em;
-  }
-  .power .arrow {
-    display: inline-block;
-    margin-right: 6px;
-    font-weight: 700;
-  }
-  .power.charging   .arrow { color: var(--green); }
-  .power.discharging .arrow { color: var(--orange); }
-  .power.idle       .arrow { color: var(--muted); }
-  .power .label { color: var(--muted); margin-left: 6px; font-size: 0.85em; }
-  .timestamp {
-    margin-top: 14px; color: var(--muted);
-    font-size: clamp(11px, 1.4vw, 13px); font-variant-numeric: tabular-nums;
-  }
+
   .offline-banner {
     background: var(--red); color: white; text-align: center;
     padding: 10px; font-weight: 600; letter-spacing: 0.5px;
     display: none;
   }
   .offline-banner.show { display: block; }
+
+  /* Main: big traffic light + guidance rows */
+  main {
+    padding: 28px 16px 16px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .traffic-display {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 44px;
+    flex-wrap: wrap;
+  }
+  .traffic-housing {
+    background: #0b0e12;
+    border: 3px solid #1f2530;
+    border-radius: 28px;
+    padding: 24px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    flex-shrink: 0;
+    box-shadow: 0 14px 30px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .t-light {
+    width: clamp(100px, 14vw, 140px);
+    height: clamp(100px, 14vw, 140px);
+    border-radius: 50%;
+    background: var(--grey);
+    box-shadow: inset 0 -8px 18px rgba(0,0,0,0.5);
+    transition: background 0.4s ease, box-shadow 0.4s ease, opacity 0.4s ease;
+    opacity: 0.18;
+  }
+  .t-light.green.active {
+    background: radial-gradient(circle at 30% 30%, #4ade80, var(--green));
+    box-shadow: 0 0 50px rgba(34,197,94,0.75), inset 0 -8px 18px rgba(0,0,0,0.3);
+    opacity: 1;
+  }
+  .t-light.orange.active {
+    background: radial-gradient(circle at 30% 30%, #fbbf24, var(--orange));
+    box-shadow: 0 0 50px rgba(245,158,11,0.75), inset 0 -8px 18px rgba(0,0,0,0.3);
+    opacity: 1;
+  }
+  .t-light.red.active {
+    background: radial-gradient(circle at 30% 30%, #f87171, var(--red));
+    box-shadow: 0 0 50px rgba(239,68,68,0.75), inset 0 -8px 18px rgba(0,0,0,0.3);
+    opacity: 1;
+  }
+
+  .traffic-rows {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 20px;
+    max-width: 620px;
+    flex: 1;
+  }
+  .traffic-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-height: clamp(100px, 14vw, 140px);
+    font-size: clamp(16px, 2vw, 19px);
+    line-height: 1.35;
+    transition: opacity 0.4s ease;
+    opacity: 0.4;
+  }
+  .traffic-row.active {
+    opacity: 1;
+  }
+  .t-label {
+    font-weight: 700;
+    font-size: clamp(18px, 2.4vw, 22px);
+    letter-spacing: 1px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    min-width: 88px;
+  }
+  .t-row-green  .t-label { color: var(--green); }
+  .t-row-orange .t-label { color: var(--orange); }
+  .t-row-red    .t-label { color: var(--red); }
+  .t-desc {
+    color: var(--text);
+  }
+
+  /* Small inverter status row */
+  .inverter-mini-row {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    flex-wrap: wrap;
+    margin-top: 32px;
+    color: var(--muted);
+    font-size: clamp(13px, 1.6vw, 15px);
+  }
+  .inverter-mini {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .inverter-mini .mini-label {
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-size: 0.85em;
+  }
+  .inverter-mini .mini-soc {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 1.1em;
+    font-variant-numeric: tabular-nums;
+  }
+  .inverter-mini .mini-power {
+    color: var(--muted);
+    font-size: 0.9em;
+  }
+  .inverter-mini.stale { opacity: 0.55; }
+  .timestamp {
+    text-align: center; color: var(--muted);
+    font-size: clamp(11px, 1.4vw, 13px); margin-top: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .traffic-footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: clamp(13px, 1.6vw, 14px);
+    margin: 36px 16px 0;
+    font-style: italic;
+  }
+
   footer {
-    text-align: center; padding: 16px;
+    text-align: center; padding: 24px 16px;
     color: var(--muted); font-size: 12px;
   }
-  .legend {
-    display: flex; gap: 18px; justify-content: center; flex-wrap: wrap;
-    margin-top: 8px;
+
+  @media (max-width: 640px) {
+    .traffic-display { flex-direction: column; align-items: center; gap: 24px; }
+    .traffic-rows { max-width: none; width: 100%; }
+    .traffic-row { min-height: auto; flex-direction: column; align-items: flex-start; gap: 4px; }
+    .t-label { min-width: 0; }
   }
-  .legend span {
-    display: inline-flex; align-items: center; gap: 6px;
-  }
-  .legend i {
-    width: 12px; height: 12px; border-radius: 50%; display: inline-block;
-  }
-  .legend .g { background: var(--green); }
-  .legend .o { background: var(--orange); }
-  .legend .r { background: var(--red); }
 </style>
 </head>
 <body>
@@ -127,47 +195,104 @@
 <header>
   <h1>{{ site_name }} — Battery State of Charge</h1>
   <div class="subtitle">
-    Green ≥{{ green_min }}% &nbsp;·&nbsp; Orange {{ orange_min }}–{{ green_min }}% &nbsp;·&nbsp; Red &lt;{{ orange_min }}%
+    Status updates every 5 s
   </div>
 </header>
 
 <main>
-  <section class="card" id="card-sppro">
-    <p class="device-name">SP Pro</p>
-    <div class="light unknown" id="light-sppro"><div class="soc" id="soc-sppro">—</div></div>
-    <div class="power idle" id="power-sppro"><span class="arrow">·</span><span id="power-val-sppro">—</span><span class="label">battery</span></div>
-    <div class="timestamp" id="ts-sppro">waiting for data…</div>
-  </section>
+  <div class="traffic-display">
+    <div class="traffic-housing" aria-hidden="true">
+      <div class="t-light green"  id="light-green"></div>
+      <div class="t-light orange" id="light-orange"></div>
+      <div class="t-light red"    id="light-red"></div>
+    </div>
 
-  <section class="card" id="card-solis">
-    <p class="device-name">Solis</p>
-    <div class="light unknown" id="light-solis"><div class="soc" id="soc-solis">—</div></div>
-    <div class="power idle" id="power-solis"><span class="arrow">·</span><span id="power-val-solis">—</span><span class="label">battery</span></div>
-    <div class="timestamp" id="ts-solis">waiting for data…</div>
-  </section>
+    <div class="traffic-rows">
+      <div class="traffic-row t-row-green" id="row-green">
+        <span class="t-label">Green</span>
+        <span class="t-desc">EV charging, electric heating/cooling &amp; induction cooking</span>
+      </div>
+      <div class="traffic-row t-row-orange" id="row-orange">
+        <span class="t-label">Orange</span>
+        <span class="t-desc">Electric heating/cooling, induction cooking for 10 mins only</span>
+      </div>
+      <div class="traffic-row t-row-red" id="row-red">
+        <span class="t-label">Red</span>
+        <span class="t-desc">Lights, fridges, freezers &amp; basic power only</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="inverter-mini-row">
+    <div class="inverter-mini" id="mini-sppro">
+      <span class="mini-label">SP Pro</span>
+      <span class="mini-soc"   id="mini-soc-sppro">—%</span>
+      <span class="mini-power" id="mini-power-sppro">—</span>
+    </div>
+    <div class="inverter-mini" id="mini-solis">
+      <span class="mini-label">Solis</span>
+      <span class="mini-soc"   id="mini-soc-solis">—%</span>
+      <span class="mini-power" id="mini-power-solis">—</span>
+    </div>
+  </div>
+
+  <div class="timestamp" id="last-update">waiting for data…</div>
+
+  <p class="traffic-footer">
+    The community battery works best when everyone reduces non-essential loads during orange and red periods.
+  </p>
 </main>
 
 <footer>
-  <div class="legend">
-    <span><i class="g"></i> Green ≥{{ green_min }}%</span>
-    <span><i class="o"></i> Orange {{ orange_min }}–{{ green_min }}%</span>
-    <span><i class="r"></i> Red &lt;{{ orange_min }}%</span>
-  </div>
-  <div style="margin-top:6px;">Auto-refreshes every 5 s — page reloads every 15 min as a backstop.</div>
+  Auto-refreshes every 5 s — page reloads every 15 min as a backstop.
 </footer>
 
 <script>
 (function () {
   const POLL_MS = 5000;
-  const STALE_AFTER_MS = 60 * 1000;     // dim a device whose data hasn't moved in 60 s
-  const WATCHDOG_MS    = 120 * 1000;    // force-reload page if no successful fetch in 2 min
-
+  const STALE_AFTER_MS = 60 * 1000;
+  const WATCHDOG_MS    = 120 * 1000;
   let lastSuccessfulFetch = Date.now();
+
+  // Per the formula:
+  //   Green  : SP Pro >= 70 AND Solis >= 70
+  //   Orange : SP Pro >= 70 AND Solis 40-70
+  //   Red    : SP Pro <  70 AND Solis <  40
+  //   Fallback for uncovered combinations: orange (moderate concern)
+  //
+  // Degraded modes:
+  //   - If only one inverter is reporting (e.g. SP Pro is down), use just
+  //     that inverter's SOC against the standard thresholds. Better to show
+  //     a colour from partial data than to leave the light dark.
+  //   - If neither is reporting, return "unknown" and leave the light dark.
+  function socThresholdStatus(soc) {
+    if (soc >= 70) return "green";
+    if (soc >= 40) return "orange";
+    return "red";
+  }
+  function overallStatus(sppro, solis) {
+    const haveSppro = (sppro !== null && sppro !== undefined);
+    const haveSolis = (solis !== null && solis !== undefined);
+    if (!haveSppro && !haveSolis) return "unknown";
+    if (!haveSppro) return socThresholdStatus(solis);
+    if (!haveSolis) return socThresholdStatus(sppro);
+    // Both reporting — apply the combined formula
+    if (sppro >= 70 && solis >= 70) return "green";
+    if (sppro <  70 && solis <  40) return "red";
+    if (sppro >= 70 && solis >= 40 && solis < 70) return "orange";
+    // Any other combination — escalate to red if either is critically low,
+    // otherwise orange as a moderate-concern fallback.
+    if (sppro < 40 || solis < 40) return "red";
+    return "orange";
+  }
 
   function fmtPower(w) {
     if (w === null || w === undefined || isNaN(w)) return "—";
     const kw = w / 1000;
-    return Math.abs(kw).toFixed(2) + " kW";
+    if (Math.abs(kw) < 0.05) return "idle";
+    const arrow = w > 0 ? "▲" : "▼";
+    const verb  = w > 0 ? "charging" : "discharging";
+    return `${arrow} ${Math.abs(kw).toFixed(2)} kW ${verb}`;
   }
 
   function fmtAge(iso) {
@@ -180,60 +305,31 @@
     return Math.round(ageSec / 3600) + "h ago";
   }
 
-  function renderDevice(key, dev) {
-    const card  = document.getElementById("card-" + key);
-    const light = document.getElementById("light-" + key);
-    const soc   = document.getElementById("soc-" + key);
-    const power = document.getElementById("power-" + key);
-    const pval  = document.getElementById("power-val-" + key);
-    const ts    = document.getElementById("ts-" + key);
-
-    // Light + SOC number
-    light.classList.remove("green", "orange", "red", "unknown");
-    light.classList.add(dev.status || "unknown");
-    soc.textContent = (dev.soc === null || dev.soc === undefined)
-      ? "—"
-      : Math.round(dev.soc) + "%";
-
-    // Battery power
-    power.classList.remove("charging", "discharging", "idle");
-    const arrow = power.querySelector(".arrow");
-    if (dev.power_w === null || dev.power_w === undefined || isNaN(dev.power_w)) {
-      power.classList.add("idle");
-      arrow.textContent = "·";
-      pval.textContent = "—";
-    } else if (dev.power_w > 50) {            // charging
-      power.classList.add("charging");
-      arrow.textContent = "▲";
-      pval.textContent = fmtPower(dev.power_w) + " charging";
-    } else if (dev.power_w < -50) {           // discharging
-      power.classList.add("discharging");
-      arrow.textContent = "▼";
-      pval.textContent = fmtPower(dev.power_w) + " discharging";
-    } else {
-      power.classList.add("idle");
-      arrow.textContent = "·";
-      pval.textContent = "idle (" + fmtPower(dev.power_w) + ")";
+  function setActive(status) {
+    for (const c of ["green", "orange", "red"]) {
+      const light = document.getElementById("light-" + c);
+      const row   = document.getElementById("row-" + c);
+      const isActive = (status === c);
+      if (light) light.classList.toggle("active", isActive);
+      if (row)   row.classList.toggle("active", isActive);
     }
+  }
 
-    // Timestamp + staleness
+  function renderMini(key, dev) {
+    const card  = document.getElementById("mini-" + key);
+    const soc   = document.getElementById("mini-soc-" + key);
+    const power = document.getElementById("mini-power-" + key);
+    soc.textContent = (dev.soc === null || dev.soc === undefined)
+      ? "—%" : Math.round(dev.soc) + "%";
+    power.textContent = "· " + fmtPower(dev.power_w);
+
     const stampStr = dev.fetched_at || dev.polled_at;
     let stale = false;
     if (stampStr) {
       const stampMs = new Date(stampStr).getTime();
       stale = !isNaN(stampMs) && (Date.now() - stampMs) > STALE_AFTER_MS;
-    } else {
-      stale = true;
     }
     card.classList.toggle("stale", stale || !dev.online);
-
-    if (dev.error) {
-      ts.textContent = "error: " + dev.error;
-    } else if (!dev.online && dev.soc === null) {
-      ts.textContent = "no data from upstream";
-    } else {
-      ts.textContent = "updated " + fmtAge(stampStr);
-    }
   }
 
   async function refresh() {
@@ -241,10 +337,24 @@
       const r = await fetch("/api/soc?_=" + Date.now(), { cache: "no-store" });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const data = await r.json();
-      renderDevice("sppro", data.devices.sppro);
-      renderDevice("solis", data.devices.solis);
 
-      const allOk = data.devices.sppro.online || data.devices.solis.online;
+      const sppro = data.devices.sppro;
+      const solis = data.devices.solis;
+
+      renderMini("sppro", sppro);
+      renderMini("solis", solis);
+
+      const status = overallStatus(sppro.soc, solis.soc);
+      setActive(status);
+
+      const newest = [sppro.fetched_at, solis.fetched_at]
+        .filter(Boolean)
+        .map(s => new Date(s).getTime())
+        .sort((a, b) => b - a)[0];
+      document.getElementById("last-update").textContent =
+        newest ? "Updated " + fmtAge(new Date(newest).toISOString()) : "waiting for data…";
+
+      const allOk = sppro.online || solis.online;
       document.getElementById("offline-banner").classList.toggle("show", !allOk);
 
       lastSuccessfulFetch = Date.now();
@@ -254,10 +364,9 @@
     }
   }
 
-  // Watchdog — if we go too long without a successful fetch, reload the page
   setInterval(() => {
     if (Date.now() - lastSuccessfulFetch > WATCHDOG_MS) {
-      console.warn("Watchdog: no successful fetch in " + WATCHDOG_MS + "ms — reloading");
+      console.warn("Watchdog: no successful fetch — reloading");
       location.reload();
     }
   }, 10000);

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="900">
+<title>Moora Moora Lodge</title>
+<style>
+  :root { --bg:#111; --card:#1c1c1c; --fg:#eee; --mute:#999; --line:#333;
+          --green:#4caf50; --orange:#ff9800; --red:#e53935; }
+  * { box-sizing:border-box; margin:0; }
+  html, body { height:100%; background:var(--bg); color:var(--fg);
+               font-family: system-ui, sans-serif; overflow:hidden; }
+  body { display:grid; grid-template-rows:64px 1fr 36px; padding:16px; gap:14px; }
+  header { display:flex; justify-content:space-between; align-items:center;
+           border-bottom:1px solid var(--line); font-size:30px; }
+  header > div { white-space:nowrap; }
+  header .msg { flex:1; min-width:0; margin:0 24px; text-align:center; overflow:hidden;
+                text-overflow:ellipsis; font-size:22px; color:var(--orange); }
+  main { display:grid; grid-template-columns:1fr 1fr; gap:14px; min-height:0; }
+  .col { display:grid; grid-auto-rows:1fr; gap:14px; min-height:0; }
+  .card { background:var(--card); border-radius:14px; padding:18px 22px; overflow:hidden; }
+  .card h2 { font-size:20px; font-weight:500; color:var(--mute); margin-bottom:8px; }
+  .big { font-size:56px; font-weight:500; line-height:1; }
+  .lights { display:flex; gap:40px; align-items:center; }
+  .light { display:flex; align-items:center; gap:14px; font-size:34px; }
+  .dot { width:48px; height:48px; border-radius:50%; background:#555; }
+  .dot.green { background:var(--green); } .dot.orange { background:var(--orange); } .dot.red { background:var(--red); }
+  .sub { color:var(--mute); font-size:20px; margin-top:6px; }
+  .bar { height:16px; background:#333; border-radius:8px; margin:10px 0; }
+  .bar i { display:block; height:100%; border-radius:8px; background:var(--green); }
+  .rows { font-size:24px; line-height:1.6; }
+  .rows div { display:flex; justify-content:space-between; }
+  .rows span:first-child { color:var(--mute); width:110px; }
+  .fire { border-left:14px solid #555; }
+  .fire.moderate { border-color:var(--green); } .fire.high { border-color:#fdd835; }
+  .fire.extreme { border-color:var(--orange); } .fire.catastrophic { border-color:var(--red); }
+  footer { display:flex; justify-content:space-between; color:var(--mute); font-size:16px; }
+  .stale { opacity:.45; }
+</style>
+</head>
+<body>
+<header>
+  <div>Moora Moora Lodge</div>
+  <div class="msg" id="msg"></div>
+  <div id="clock">--:--</div>
+</header>
+
+<main>
+  <div class="col">
+    <div class="card">
+      <h2>Microgrid status</h2>
+      <div class="lights">
+        <div class="light"><div class="dot" id="sppro-dot"></div><div><div id="sppro-soc">--%</div><div class="sub">SP Pro</div></div></div>
+        <div class="light"><div class="dot" id="solis-dot"></div><div><div id="solis-soc">--%</div><div class="sub">Solis</div></div></div>
+      </div>
+      <div class="sub" id="power">--</div>
+    </div>
+    <div class="card">
+      <h2>Battery</h2>
+      <div class="big" id="soc-avg">--%</div>
+      <div class="bar"><i id="soc-bar" style="width:0%"></i></div>
+      <div class="sub" id="soc-note">--</div>
+    </div>
+    <div class="card">
+      <h2>EV charging</h2>
+      <div class="big" style="font-size:34px" id="ev">Restricted in winter</div>
+      <div class="sub">Enabled roughly Oct to Mar. Ask at the Lodge.</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card" id="fc-card">
+      <h2>Forecast <span id="fc-now"></span></h2>
+      <div class="rows" id="fc-rows"></div>
+    </div>
+    <div class="card fire" id="fire-card">
+      <h2>Fire danger, Central district</h2>
+      <div class="big" style="font-size:40px" id="fire-rating">--</div>
+      <div class="sub" id="fire-tomorrow"></div>
+    </div>
+    <div class="card" id="events-card">
+      <h2>Coming up</h2>
+      <div class="rows" id="events-rows"></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div id="updated">Updated --</div>
+  <div>monitor.mooramoora.org.au</div>
+</footer>
+
+<script>
+const WMO = {0:"Clear",1:"Mostly clear",2:"Partly cloudy",3:"Cloudy",45:"Fog",48:"Fog",
+  51:"Drizzle",53:"Drizzle",55:"Drizzle",61:"Light rain",63:"Rain",65:"Heavy rain",
+  71:"Snow",73:"Snow",75:"Snow",80:"Showers",81:"Showers",82:"Heavy showers",95:"Storms",96:"Storms",99:"Storms"};
+const nf = url => fetch(url + (url.includes("?")?"&":"?") + "_=" + Date.now(), {cache:"no-store"}).then(r=>r.json());
+const deg = v => v==null ? "–" : Math.round(v);
+const todayIso = () => new Date().toLocaleDateString("en-CA");   // YYYY-MM-DD, local
+const dayName = d => new Date(d+"T12:00:00").toLocaleDateString("en-AU",{weekday:"short"});
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// Counts from page load, so a page that never gets /api/soc still reloads.
+let lastOk = Date.now();
+
+function tickClock(){
+  document.getElementById("clock").textContent =
+    new Date().toLocaleString("en-AU",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit",hour12:false});
+}
+
+async function pollSoc(){
+  try {
+    const j = await nf("/api/soc");
+    const d = j.devices; let socs=[];
+    for (const k of ["sppro","solis"]) {
+      const dev=d[k]; const dot=document.getElementById(k+"-dot");
+      dot.className="dot "+(dev.online?dev.status:"");
+      document.getElementById(k+"-soc").textContent = dev.soc!=null ? Math.round(dev.soc)+"%" : "--";
+      if (dev.online && dev.soc!=null) socs.push(dev.soc);
+    }
+    const pw=(d.sppro.power_w||0)+(d.solis.power_w||0);
+    document.getElementById("power").textContent =
+      (pw>=0?"Charging ":"Discharging ")+Math.abs(pw/1000).toFixed(1)+" kW";
+    if (socs.length){
+      const avg=socs.reduce((a,b)=>a+b,0)/socs.length;
+      document.getElementById("soc-avg").textContent=Math.round(avg)+"%";
+      const bar=document.getElementById("soc-bar"); bar.style.width=avg+"%";
+      bar.style.background = avg>=70?"var(--green)":avg>=40?"var(--orange)":"var(--red)";
+      document.getElementById("soc-note").textContent =
+        avg>=70?"Plenty of energy. Good time for heavy loads.":avg>=40?"Use energy carefully.":"Low. Essential loads only.";
+    }
+    lastOk=Date.now();
+    document.getElementById("updated").textContent="Updated "+new Date().toLocaleTimeString("en-AU",{hour:"2-digit",minute:"2-digit",hour12:false});
+  } catch(e){ console.warn(e); }
+  if (Date.now()-lastOk > 120000) location.reload();
+}
+
+async function pollExtras(){
+  try {
+    const j = await nf("/api/extras"); const s=j.sources;
+    document.getElementById("msg").textContent = j.message || "";
+    const stale = (id, src)=>document.getElementById(id).classList.toggle("stale", !!s[src].error);
+    if (s.forecast.data){
+      const f=s.forecast.data;
+      document.getElementById("fc-now").textContent=" · now "+deg(f.now_temp)+"° "+(WMO[f.now_code]||"");
+      document.getElementById("fc-rows").innerHTML=f.days.map(d=>
+        `<div><span>${dayName(d.date)}</span><span>${WMO[d.code]||""}</span><span>${deg(d.min)} / ${deg(d.max)}°</span></div>`).join("");
+    }
+    if (s.fire.data && s.fire.data.periods.length){
+      // Skip yesterday if the feed hasn't rolled over yet.
+      const p=s.fire.data.periods.filter(x=>x.date>=todayIso()); const t=p[0]||s.fire.data.periods[0];
+      const r=t.rating;
+      document.getElementById("fire-rating").textContent=r+(t.tfb?" · TOTAL FIRE BAN":"");
+      document.getElementById("fire-tomorrow").textContent=p[1]?"Tomorrow: "+p[1].rating+(p[1].tfb?" · Total Fire Ban":""):"";
+      document.getElementById("fire-card").className="card fire "+r.toLowerCase().split(" ")[0];
+    }
+    if (s.events.data){
+      document.getElementById("events-rows").innerHTML=s.events.data.slice(0,4).map(e=>{
+        const d=e.start?new Date(e.start):null;
+        const lbl=d?d.toLocaleDateString("en-AU",{weekday:"short",day:"numeric"}):"";
+        return `<div><span>${lbl}</span><span style="text-align:right">${esc(e.title)}</span></div>`;}).join("")
+        || "<div>No events listed</div>";
+    }
+    stale("fc-card","forecast"); stale("fire-card","fire"); stale("events-card","events");
+  } catch(e){ console.warn(e); }
+}
+
+
+tickClock(); setInterval(tickClock,15000);
+pollSoc(); setInterval(pollSoc,5000);
+pollExtras(); setInterval(pollExtras,60000);
+</script>
+</body>
+</html>

@@ -35,6 +35,8 @@ from datetime import datetime, timezone
 import requests
 from flask import Flask, jsonify, render_template, request
 
+from extras import Extras  # Lodge kiosk: forecast, fire danger, events
+
 # --------------------------------------------------------------------------- #
 # Logging
 # --------------------------------------------------------------------------- #
@@ -216,6 +218,7 @@ class UpstreamPoller:
 
 
 POLLER: UpstreamPoller = None  # filled in by main()
+EXTRAS = Extras()  # started in main()
 
 
 # --------------------------------------------------------------------------- #
@@ -283,6 +286,18 @@ def healthz():
     return jsonify({"ok": True, "any_online": any_online}), 200
 
 
+@app.route("/api/extras")
+def api_extras():
+    return jsonify(EXTRAS.snapshot())
+
+
+@app.route("/kiosk")
+@app.route("/kiosk/")
+def kiosk():
+    """Lodge kiosk page for drongo's 1920x1080 screen."""
+    return render_template("kiosk.html")
+
+
 # --------------------------------------------------------------------------- #
 # Entry point
 # --------------------------------------------------------------------------- #
@@ -324,6 +339,7 @@ def main():
         request_timeout=args.request_timeout,
     )
     POLLER.start()
+    EXTRAS.start()
 
     log.info("SOC Traffic Light listening on %s:%d (upstream=%s)",
              args.host, args.port, args.upstream)

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="refresh" content="900">
 <title>Moora Moora Lodge</title>
 <style>
@@ -95,6 +96,61 @@
   .event .when { font-size:16px; color:var(--mute); }
 
   footer { display:flex; justify-content:space-between; align-items:center; color:var(--mute); font-size:15px; }
+
+  /* Landscape screens: laid out at 1920x1080 (drongo's size) and scaled to fit by fitKiosk(). */
+  body.fit { position:absolute; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0; }
+
+  /* --- phones, narrow windows and portrait tablets: scrolling single column --- */
+  @media (max-width: 900px), (orientation: portrait) {
+    html, body { height:auto; overflow:auto; }
+    body { display:block; padding:12px; }
+    header { flex-wrap:wrap; font-size:22px; padding-bottom:8px; margin-bottom:12px; gap:4px 12px; }
+    header .msg { order:3; flex-basis:100%; margin:0; font-size:16px; white-space:normal; text-align:left; }
+    #clock { font-size:16px; color:var(--mute); }
+    main, .col { display:flex; flex-direction:column; gap:12px; }
+    main { margin-bottom:12px; }
+    .card { padding:14px 16px; border-radius:14px; }
+    .card h2 { font-size:16px; margin-bottom:8px; }
+    .body { gap:16px; }
+    .sub { font-size:15px; }
+
+    .systems { grid-template-columns:1fr; gap:10px; }
+    .sys { gap:6px; }
+    .sys .name { font-size:19px; } .sys .soc { font-size:24px; }
+    .dot { width:22px; height:22px; }
+    .kv { font-size:16px; }
+    .load { font-size:16px; flex-wrap:wrap; } .load b { font-size:20px; }
+
+    #batt-svg { height:150px; }
+    .batt-info .pct { font-size:48px; }
+    .batt-info .note { font-size:16px; margin-top:6px; }
+    .batt-info .split { margin-top:8px; }
+
+    #evc-card .body { flex-direction:column; align-items:stretch; }
+    .ev-stats .kw { font-size:40px; } .ev-stats .kwh { font-size:22px; }
+    .ev-stats .kw small, .ev-stats .kwh small { font-size:17px; }
+    .pill { font-size:14px; }
+    .ev-chart { height:110px; flex:none; }
+
+    .fc { gap:6px; }
+    .day { padding:8px 2px; gap:2px; }
+    .day .dn { font-size:15px; }
+    .day svg.wx { width:40px; height:40px; }
+    .day .desc { font-size:11px; white-space:normal; line-height:1.2; }
+    .day .t { font-size:16px; } .day .rain { font-size:12px; }
+
+    #fire-card .body { flex-wrap:wrap; }
+    #fire-gauge { height:auto; width:min(220px, 55%); }
+    .fire-info .rating { font-size:30px; }
+    .fire-info .tomorrow { font-size:15px; margin-top:6px; }
+    .tfb { font-size:14px; }
+
+    .ev-head img { height:36px; }
+    .cal { width:48px; } .cal .d { font-size:21px; } .cal .m { font-size:11px; }
+    .event { gap:12px; } .event .title { font-size:16px; } .event .when { font-size:13px; }
+
+    footer { font-size:13px; flex-wrap:wrap; gap:4px 12px; }
+  }
 </style>
 </head>
 <body>
@@ -416,6 +472,18 @@ async function pollExtras(){
     stale("fc-card","forecast"); stale("fire-card","fire"); stale("events-card","events");
   } catch(e){ console.warn(e); }
 }
+
+// Keep the 1920x1080 kiosk layout on any landscape screen by scaling it; the
+// phone/portrait layout (same media query as the CSS) scrolls instead.
+const MOBILE = matchMedia("(max-width: 900px), (orientation: portrait)");
+function fitKiosk(){
+  const b = document.body;
+  if (MOBILE.matches) { b.classList.remove("fit"); b.style.transform = ""; return; }
+  const s = Math.min(innerWidth/1920, innerHeight/1080);
+  b.classList.add("fit");
+  b.style.transform = `translate(${(innerWidth-1920*s)/2}px, ${(innerHeight-1080*s)/2}px) scale(${s})`;
+}
+addEventListener("resize", fitKiosk); fitKiosk();
 
 drawBatteryShell(); drawGaugeShell();
 tickClock(); setInterval(tickClock,15000);

@@ -59,6 +59,9 @@
   .pair { display:grid; grid-template-columns:1fr 1fr; gap:14px; min-height:0; }
 
   /* --- Lodge hot water --- */
+  #hw-svg { height:100%; max-height:100%; flex:none; }
+  #hw-water, #hw-surface { transition:fill .8s; }
+  #hw-element { transition:stroke .5s, filter .5s; }
   .hw-info .temp { font-size:72px; font-weight:600; line-height:1; }
   .hw-info .temp small { font-size:30px; color:var(--mute); font-weight:400; }
   .hw-info .kw { font-size:44px; font-weight:600; line-height:1; margin-top:16px; }
@@ -132,6 +135,7 @@
     .load { font-size:16px; flex-wrap:wrap; } .load b { font-size:20px; }
 
     .pair { display:flex; flex-direction:column; gap:12px; }
+    #hw-svg { height:150px; }
     .hw-info .temp { font-size:48px; } .hw-info .kw { font-size:32px; margin-top:10px; }
     .hw-info .note { font-size:16px; }
     #batt-svg { height:150px; }
@@ -210,9 +214,10 @@
     <div class="card" id="hw-card">
       <h2><svg class="i" viewBox="0 0 24 24"><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0zM12 9v7"/></svg>Lodge hot water</h2>
       <div class="body">
+        <svg id="hw-svg" viewBox="0 0 120 230" role="img" aria-label="Hot water tank"></svg>
         <div class="hw-info">
           <div class="temp num"><span id="hw-temp">--</span><small>°C</small></div>
-          <div class="sub">Tank temperature</div>
+          <div class="sub" id="hw-band">Tank temperature</div>
           <div class="kw num"><span id="hw-kw">--</span> <small>kW</small></div>
           <div class="note sub" id="hw-note">--</div>
         </div>
@@ -463,16 +468,53 @@ async function pollEvHistory(){
 }
 
 /* ---------------- Lodge hot water (hotwater_controller dashboard API) ---------------- */
+// Comfort bands for the tank water colour: [min °C, label, colour], hottest first.
+const HW_BANDS = [[60,"Very hot","#ef4444"], [50,"Hot","#f97316"], [40,"Warm","#eab308"], [-Infinity,"Cold","#3b82f6"]];
+const hwBand = t => t == null ? null : HW_BANDS.find(([min]) => t >= min);
+function drawTankShell(){
+  const s = $("hw-svg");
+  const defs = el("defs", {}, s);
+  const glow = el("filter", {id:"hwglow", x:"-50%", y:"-50%", width:"200%", height:"200%"}, defs);
+  el("feGaussianBlur", {stdDeviation:2.5, result:"b"}, glow);
+  const m = el("feMerge", {}, glow); el("feMergeNode", {in:"b"}, m); el("feMergeNode", {in:"SourceGraphic"}, m);
+  // pipes: hot out (left), cold in (right)
+  el("rect", {x:34, y:2, width:10, height:30, rx:2, fill:"#4a5260"}, s);
+  el("rect", {x:76, y:2, width:10, height:30, rx:2, fill:"#4a5260"}, s);
+  // insulated shell: domed top and bottom
+  el("path", {d:"M10 44 a50 16 0 0 1 100 0 v150 a50 16 0 0 1 -100 0 z", fill:"url(#cyl)", stroke:"#454d5a", "stroke-width":2}, s);
+  // water, its surface, and shading so it reads as a cylinder
+  el("path", {id:"hw-water", d:"M20 52 v142 a40 10 0 0 0 80 0 v-142 z", fill:"#262b33"}, s);
+  el("ellipse", {id:"hw-surface", cx:60, cy:52, rx:40, ry:9, fill:"#262b33"}, s);
+  el("path", {d:"M20 52 v142 a40 10 0 0 0 80 0 v-142 z", fill:"url(#barshade)", "pointer-events":"none"}, s);
+  el("ellipse", {cx:60, cy:52, rx:40, ry:9, fill:"#fff", "fill-opacity":.12}, s);
+  // heating element near the bottom; glows while heating. Dark outline keeps it visible on any water colour.
+  const coil = "M30 186 l6 -8 l6 8 l6 -8 l6 8 l6 -8 l6 8 l6 -8 l6 8 l6 -8 l6 8";
+  el("path", {d:coil, fill:"none", stroke:"#11151b", "stroke-width":6, "stroke-linecap":"round", "stroke-linejoin":"round"}, s);
+  el("path", {id:"hw-element", d:coil, fill:"none", stroke:"#5b6472", "stroke-width":3, "stroke-linecap":"round", "stroke-linejoin":"round"}, s);
+}
+function drawTank(temp, heating){
+  const b = hwBand(temp), col = b ? b[2] : "#262b33";
+  $("hw-water").setAttribute("fill", col);
+  $("hw-surface").setAttribute("fill", col);
+  $("hw-surface").setAttribute("fill-opacity", b ? .75 : 1);
+  const e = $("hw-element");
+  e.setAttribute("stroke", heating ? "var(--sun)" : "#5b6472");
+  e.setAttribute("filter", heating ? "url(#hwglow)" : "");
+}
 async function pollHotWater(){
   try {
     const {snapshot, age_s} = await nf("/hotwater/api/state");
     const h = ((snapshot && snapshot.heaters) || []).find(x => x.name === "Lodge");
     if (!h || !h.reachable || age_s > 120) throw new Error("Lodge hot water data unavailable");
-    $("hw-temp").textContent = h.temp_c == null ? "--" : Math.round(h.temp_c);
+    const t = num(h.temp_c), band = hwBand(t);
+    $("hw-temp").textContent = t === null ? "--" : Math.round(t);
+    $("hw-temp").parentElement.style.color = band ? band[2] : "";
+    $("hw-band").textContent = band ? "Tank temperature · " + band[1] : "Tank temperature";
     const w = num(h.power_w);
     $("hw-kw").textContent = w === null ? "--" : (w < 50 ? 0 : w/1000).toFixed(1);
     $("hw-kw").style.color = w > 100 ? "var(--sun)" : "";
     $("hw-note").textContent = w > 100 ? "Heating from solar surplus" : "Not heating";
+    drawTank(t, w > 100);
     $("hw-card").classList.remove("stale");
   } catch(e){
     console.warn(e);
@@ -531,7 +573,7 @@ function fitKiosk(){
 }
 addEventListener("resize", fitKiosk); fitKiosk();
 
-drawBatteryShell(); drawGaugeShell();
+drawBatteryShell(); drawGaugeShell(); drawTankShell();
 tickClock(); setInterval(tickClock,15000);
 pollSoc(); setInterval(pollSoc,5000);
 pollEv(); setInterval(pollEv,10000);

@@ -67,6 +67,7 @@
   .hw-info .kw { font-size:44px; font-weight:600; line-height:1; margin-top:16px; }
   .hw-info .kw small { font-size:22px; color:var(--mute); font-weight:400; }
   .hw-info .note { font-size:19px; margin-top:10px; }
+  .hw-info .hz { font-size:19px; margin-top:4px; }
 
   /* --- EV --- */
   .ev-stats .kw { font-size:58px; font-weight:600; line-height:1; }
@@ -137,7 +138,7 @@
     .pair { display:flex; flex-direction:column; gap:12px; }
     #hw-svg { height:150px; }
     .hw-info .temp { font-size:48px; } .hw-info .kw { font-size:32px; margin-top:10px; }
-    .hw-info .note { font-size:16px; }
+    .hw-info .note, .hw-info .hz { font-size:16px; }
     #batt-svg { height:150px; }
     .batt-info .pct { font-size:48px; }
     .batt-info .note { font-size:16px; margin-top:6px; }
@@ -220,6 +221,7 @@
           <div class="sub" id="hw-band">Tank temperature</div>
           <div class="kw num"><span id="hw-kw">--</span> <small>kW</small></div>
           <div class="note sub" id="hw-note">--</div>
+          <div class="hz sub num" id="hw-hz"></div>
         </div>
       </div>
     </div>
@@ -514,6 +516,11 @@ async function pollHotWater(){
     $("hw-kw").textContent = w === null ? "--" : (w < 50 ? 0 : w/1000).toFixed(1);
     $("hw-kw").style.color = w > 100 ? "var(--sun)" : "";
     $("hw-note").textContent = w > 100 ? "Heating from solar surplus" : "Not heating";
+    // Yellow above the controller's start frequency: the SP Pro is curtailing solar, which can trigger heating.
+    const hz = num(snapshot.grid_freq_hz), fStart = num((snapshot.rules || {}).freq_start_hz) ?? 50.2;
+    $("hw-hz").textContent = hz === null ? "" : `Microgrid ${hz.toFixed(2)} Hz`;
+    $("hw-hz").style.color = hz > fStart ? "var(--sun)" : "";
+    $("hw-hz").title = hz > fStart ? "Above " + fStart + " Hz: SP Pro is curtailing solar" : "";
     drawTank(t, w > 100);
     $("hw-card").classList.remove("stale");
   } catch(e){

@@ -55,6 +55,16 @@
   .batt-info .note { font-size:21px; margin-top:10px; }
   .batt-info .split { margin-top:14px; }
 
+  /* --- battery + hot water share one row --- */
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:14px; min-height:0; }
+
+  /* --- Lodge hot water --- */
+  .hw-info .temp { font-size:72px; font-weight:600; line-height:1; }
+  .hw-info .temp small { font-size:30px; color:var(--mute); font-weight:400; }
+  .hw-info .kw { font-size:44px; font-weight:600; line-height:1; margin-top:16px; }
+  .hw-info .kw small { font-size:22px; color:var(--mute); font-weight:400; }
+  .hw-info .note { font-size:19px; margin-top:10px; }
+
   /* --- EV --- */
   .ev-stats .kw { font-size:58px; font-weight:600; line-height:1; }
   .ev-stats .kw small, .ev-stats .kwh small { font-size:24px; color:var(--mute); font-weight:400; }
@@ -121,6 +131,9 @@
     .kv { font-size:16px; }
     .load { font-size:16px; flex-wrap:wrap; } .load b { font-size:20px; }
 
+    .pair { display:flex; flex-direction:column; gap:12px; }
+    .hw-info .temp { font-size:48px; } .hw-info .kw { font-size:32px; margin-top:10px; }
+    .hw-info .note { font-size:16px; }
     #batt-svg { height:150px; }
     .batt-info .pct { font-size:48px; }
     .batt-info .note { font-size:16px; margin-top:6px; }
@@ -181,6 +194,7 @@
       <div class="load"><svg class="i" viewBox="0 0 24 24"><path d="M3 11 12 3l9 8M5 10v10h14V10"/></svg>Community load <b class="num" id="load">--</b><span id="hsolar"></span></div>
     </div>
 
+    <div class="pair">
     <div class="card">
       <h2><svg class="i" viewBox="0 0 24 24"><rect x="7" y="4" width="10" height="17" rx="2"/><path d="M10 2h4"/></svg>Battery</h2>
       <div class="body">
@@ -191,6 +205,19 @@
           <div class="sub split num" id="soc-split"></div>
         </div>
       </div>
+    </div>
+
+    <div class="card" id="hw-card">
+      <h2><svg class="i" viewBox="0 0 24 24"><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0zM12 9v7"/></svg>Lodge hot water</h2>
+      <div class="body">
+        <div class="hw-info">
+          <div class="temp num"><span id="hw-temp">--</span><small>°C</small></div>
+          <div class="sub">Tank temperature</div>
+          <div class="kw num"><span id="hw-kw">--</span> <small>kW</small></div>
+          <div class="note sub" id="hw-note">--</div>
+        </div>
+      </div>
+    </div>
     </div>
 
     <div class="card" id="evc-card">
@@ -435,6 +462,25 @@ async function pollEvHistory(){
   } catch(e){ console.warn(e); }
 }
 
+/* ---------------- Lodge hot water (hotwater_controller dashboard API) ---------------- */
+async function pollHotWater(){
+  try {
+    const {snapshot, age_s} = await nf("/hotwater/api/state");
+    const h = ((snapshot && snapshot.heaters) || []).find(x => x.name === "Lodge");
+    if (!h || !h.reachable || age_s > 120) throw new Error("Lodge hot water data unavailable");
+    $("hw-temp").textContent = h.temp_c == null ? "--" : Math.round(h.temp_c);
+    const w = num(h.power_w);
+    $("hw-kw").textContent = w === null ? "--" : (w < 50 ? 0 : w/1000).toFixed(1);
+    $("hw-kw").style.color = w > 100 ? "var(--sun)" : "";
+    $("hw-note").textContent = w > 100 ? "Heating from solar surplus" : "Not heating";
+    $("hw-card").classList.remove("stale");
+  } catch(e){
+    console.warn(e);
+    $("hw-note").textContent = "No data from the hot water controller";
+    $("hw-card").classList.add("stale");
+  }
+}
+
 /* ---------------- forecast, fire, events ---------------- */
 async function pollExtras(){
   try {
@@ -489,6 +535,7 @@ drawBatteryShell(); drawGaugeShell();
 tickClock(); setInterval(tickClock,15000);
 pollSoc(); setInterval(pollSoc,5000);
 pollEv(); setInterval(pollEv,10000);
+pollHotWater(); setInterval(pollHotWater,15000);
 pollEvHistory(); setInterval(pollEvHistory,60000);
 pollExtras(); setInterval(pollExtras,60000);
 </script>

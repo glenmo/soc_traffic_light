@@ -63,8 +63,8 @@
     </div>
     <div class="card">
       <h2>EV charging</h2>
-      <div class="big" style="font-size:34px" id="ev">Restricted in winter</div>
-      <div class="sub">Enabled roughly Oct to Mar. Ask at the Lodge.</div>
+      <div class="big" style="font-size:34px" id="ev">--</div>
+      <div class="sub" id="ev-note"></div>
     </div>
   </div>
 
@@ -101,6 +101,17 @@ const dayName = d => new Date(d+"T12:00:00").toLocaleDateString("en-AU",{weekday
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 // Counts from page load, so a page that never gets /api/soc still reloads.
 let lastOk = Date.now();
+
+// EV charging season (southern hemisphere): summer Oct-Mar available,
+// winter Apr-Sep restricted. Static until noisy's EV page has an API.
+function evSeason(){
+  const m = new Date().getMonth() + 1;
+  const summer = m >= 10 || m <= 3;
+  document.getElementById("ev").textContent = summer ? "Available (summer season)" : "Restricted in winter";
+  document.getElementById("ev-note").textContent = summer
+    ? "Summer charging season, Oct to Mar. Ask at the Lodge."
+    : "Available again from October. Ask at the Lodge.";
+}
 
 function tickClock(){
   document.getElementById("clock").textContent =
@@ -166,6 +177,7 @@ async function pollExtras(){
 
 
 tickClock(); setInterval(tickClock,15000);
+evSeason(); setInterval(evSeason,15*60000);
 pollSoc(); setInterval(pollSoc,5000);
 pollExtras(); setInterval(pollExtras,60000);
 </script>

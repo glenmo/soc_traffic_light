@@ -97,6 +97,19 @@
   .tfb { display:inline-block; background:var(--fdr-catastrophic); color:#fff; font-weight:700;
          padding:4px 12px; border-radius:6px; font-size:18px; margin-top:10px; letter-spacing:.5px; }
 
+  /* --- traffic light (same lights and formula as the / page), shares the fire tile --- */
+  .tl { margin-left:auto; flex:none; background:#0b0e12; border:3px solid #1f2530; border-radius:20px;
+        padding:12px; display:flex; flex-direction:column; gap:10px;
+        box-shadow:0 10px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04); }
+  .tl div { width:56px; height:56px; border-radius:50%; background:#2a323d; opacity:.18;
+            box-shadow:inset 0 -6px 12px rgba(0,0,0,.5); transition:background .4s, box-shadow .4s, opacity .4s; }
+  .tl .green.on  { background:radial-gradient(circle at 30% 30%, #4ade80, var(--green));
+                   box-shadow:0 0 30px rgba(34,197,94,.75), inset 0 -6px 12px rgba(0,0,0,.3); opacity:1; }
+  .tl .orange.on { background:radial-gradient(circle at 30% 30%, #fbbf24, var(--orange));
+                   box-shadow:0 0 30px rgba(245,158,11,.75), inset 0 -6px 12px rgba(0,0,0,.3); opacity:1; }
+  .tl .red.on    { background:radial-gradient(circle at 30% 30%, #f87171, var(--red));
+                   box-shadow:0 0 30px rgba(239,68,68,.75), inset 0 -6px 12px rgba(0,0,0,.3); opacity:1; }
+
   /* --- events --- */
   .ev-head { justify-content:space-between; }
   .ev-head img { height:48px; }
@@ -162,6 +175,7 @@
     .fire-info .rating { font-size:30px; }
     .fire-info .tomorrow { font-size:15px; margin-top:6px; }
     .tfb { font-size:14px; }
+    .tl { flex-direction:row; margin-left:0; padding:8px; gap:7px; border-radius:14px; } .tl div { width:36px; height:36px; }
 
     .ev-head img { height:36px; }
     .cal { width:48px; } .cal .d { font-size:21px; } .cal .m { font-size:11px; }
@@ -258,6 +272,9 @@
           <div class="rating" id="fire-rating">--</div>
           <div id="fire-tfb"></div>
           <div class="sub tomorrow" id="fire-tomorrow"></div>
+        </div>
+        <div class="tl" id="tl" role="img" aria-label="Battery traffic light">
+          <div class="green"></div><div class="orange"></div><div class="red"></div>
         </div>
       </div>
     </div>
@@ -382,6 +399,23 @@ const WMO = {0:["clear","Clear"],1:["clear","Mostly clear"],2:["partly","Partly 
   96:["storm","Storms, hail"],99:["storm","Storms, hail"]};
 const wxIcon = code => `<svg class="i wx" viewBox="0 0 24 24" style="stroke-width:1.6">${WX[(WMO[code]||["cloudy"])[0]]}</svg>`;
 
+/* ---------------- traffic light ---------------- */
+// Same combined formula as overallStatus() in index.html (the / page); keep the two in step.
+function lightStatus(sppro, solis){
+  if (sppro == null && solis == null) return "";
+  if (sppro == null) return band(solis);
+  if (solis == null) return band(sppro);
+  if (sppro >= TH.green_min && solis >= TH.green_min) return "green";
+  if (sppro < TH.green_min && solis < TH.orange_min) return "red";
+  if (sppro >= TH.green_min && solis >= TH.orange_min) return "orange";
+  if (sppro < TH.orange_min || solis < TH.orange_min) return "red";
+  return "orange";
+}
+function drawLight(status){
+  for (const c of ["green","orange","red"]) $("tl").querySelector("."+c).classList.toggle("on", c === status);
+  $("tl").setAttribute("aria-label", "Battery traffic light: " + (status || "no data"));
+}
+
 /* ---------------- microgrid + battery ---------------- */
 async function pollSoc(){
   try {
@@ -427,6 +461,7 @@ async function pollSoc(){
       : avg>=TH.orange_min ? "Use energy carefully." : "Low. Essential loads only.";
     $("soc-split").textContent = split.join(" · ");
     drawBattery(avg);
+    drawLight(lightStatus(d.sppro.soc, d.solis.soc));
     lastOk = Date.now();
     $("updated").textContent = "Updated " + new Date().toLocaleTimeString("en-AU",{hour:"2-digit",minute:"2-digit",hour12:false});
   } catch(e){ console.warn(e); }

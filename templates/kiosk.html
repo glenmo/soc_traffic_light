@@ -91,14 +91,19 @@
   .day.today { outline:2px solid var(--line); }
 
   /* --- fire --- */
-  #fire-gauge { height:100%; flex:none; }
+  /* The gauge gives way so the longest rating ("Catastrophic" + fire ban) still fits beside the traffic light tile. */
+  #fire-gauge { height:100%; flex:0 1 auto; min-width:0; }
+  .fire-info { flex:none; }
   .fire-info .rating { font-size:46px; font-weight:700; line-height:1.05; }
   .fire-info .tomorrow { font-size:21px; margin-top:12px; }
   .tfb { display:inline-block; background:var(--fdr-catastrophic); color:#fff; font-weight:700;
          padding:4px 12px; border-radius:6px; font-size:18px; margin-top:10px; letter-spacing:.5px; }
 
-  /* --- traffic light (same lights and formula as the / page), shares the fire tile --- */
-  .tl { margin-left:auto; flex:none; background:#0b0e12; border:3px solid #1f2530; border-radius:20px;
+  /* --- traffic light (same lights and formula as the / page), own tile left of fire danger --- */
+  .tl-pair { grid-template-columns:auto 1fr; }
+  #tl-card h2 { white-space:nowrap; }
+  #tl-card .body { justify-content:center; }
+  .tl { flex:none; background:#0b0e12; border:3px solid #1f2530; border-radius:20px;
         padding:12px; display:flex; flex-direction:column; gap:10px;
         box-shadow:0 10px 22px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04); }
   .tl div { width:56px; height:56px; border-radius:50%; background:#2a323d; opacity:.18;
@@ -175,7 +180,7 @@
     .fire-info .rating { font-size:30px; }
     .fire-info .tomorrow { font-size:15px; margin-top:6px; }
     .tfb { font-size:14px; }
-    .tl { flex-direction:row; margin-left:0; padding:8px; gap:7px; border-radius:14px; } .tl div { width:36px; height:36px; }
+    .tl { flex-direction:row; padding:8px; gap:7px; border-radius:14px; } .tl div { width:36px; height:36px; }
 
     .ev-head img { height:36px; }
     .cal { width:48px; } .cal .d { font-size:21px; } .cal .m { font-size:11px; }
@@ -264,6 +269,16 @@
       <div class="fc" id="fc-days"></div>
     </div>
 
+    <div class="pair tl-pair">
+    <div class="card" id="tl-card">
+      <h2><svg class="i" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="3"/><circle cx="12" cy="7" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="17" r="1.5"/></svg>Status of Microgrid</h2>
+      <div class="body">
+        <div class="tl" id="tl" role="img" aria-label="Battery traffic light">
+          <div class="green"></div><div class="orange"></div><div class="red"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="card" id="fire-card">
       <h2><svg class="i" viewBox="0 0 24 24"><path d="M12 22c4 0 7-3 7-7 0-4-3-6-4-10-2 2-3 4-3 6-1-1-2-2-2-4-3 3-5 5-5 8 0 4 3 7 7 7z"/></svg>Fire danger, Central district</h2>
       <div class="body">
@@ -273,10 +288,8 @@
           <div id="fire-tfb"></div>
           <div class="sub tomorrow" id="fire-tomorrow"></div>
         </div>
-        <div class="tl" id="tl" role="img" aria-label="Battery traffic light">
-          <div class="green"></div><div class="orange"></div><div class="red"></div>
-        </div>
       </div>
+    </div>
     </div>
 
     <div class="card" id="events-card">

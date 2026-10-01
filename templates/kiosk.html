@@ -515,12 +515,26 @@ async function pollHotWater(){
     const w = num(h.power_w);
     $("hw-kw").textContent = w === null ? "--" : (w < 50 ? 0 : w/1000).toFixed(1);
     $("hw-kw").style.color = w > 100 ? "var(--sun)" : "";
-    $("hw-note").textContent = w > 100 ? "Heating from solar surplus" : "Not heating";
+    // Generator: the controller never heats while it runs, nor for its lockout after it stops.
+    const rules = snapshot.rules || {}, sp = snapshot.sppro;
+    const genOn = sp ? Math.abs(num(sp.grid_w) || 0) >= (num(rules.gen_threshold_w) ?? 200) : null;
+    const lock = /generator lockout \((\d+) s left\)/.exec((snapshot.decision || {}).reason || "");
+    const note = $("hw-note");
+    if (genOn) {
+      note.textContent = "Not heating: generator on";
+    } else if (lock) {
+      note.textContent = `Heating resumes in ${Math.max(1, Math.ceil(lock[1] / 60))} min`;
+    } else {
+      note.textContent = w > 100 ? "Heating from solar surplus" : "Not heating";
+    }
+    note.style.color = genOn || lock ? "var(--orange)" : "";
     // Yellow above the controller's start frequency: the SP Pro is curtailing solar, which can trigger heating.
-    const hz = num(snapshot.grid_freq_hz), fStart = num((snapshot.rules || {}).freq_start_hz) ?? 50.2;
-    $("hw-hz").textContent = hz === null ? "" : `Microgrid ${hz.toFixed(2)} Hz`;
-    $("hw-hz").style.color = hz > fStart ? "var(--sun)" : "";
-    $("hw-hz").title = hz > fStart ? "Above " + fStart + " Hz: SP Pro is curtailing solar" : "";
+    const hz = num(snapshot.grid_freq_hz), fStart = num(rules.freq_start_hz) ?? 50.2;
+    const gen = genOn === null ? "" : genOn ? "Generator ON" : lock ? "Generator stopped" : "Generator off";
+    $("hw-hz").textContent = [gen, hz === null ? "" : `${hz.toFixed(2)} Hz`].filter(Boolean).join(" · ");
+    $("hw-hz").style.color = genOn ? "var(--orange)" : hz > fStart ? "var(--sun)" : "";
+    $("hw-hz").title = (genOn ? "Generator running: the hot water controller holds all heaters at 0 W. " : "")
+      + "Hz = microgrid frequency" + (hz > fStart ? "; above " + fStart + " Hz the SP Pro is curtailing solar" : "");
     drawTank(t, w > 100);
     $("hw-card").classList.remove("stale");
   } catch(e){

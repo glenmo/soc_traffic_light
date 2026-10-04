@@ -79,6 +79,17 @@
   .ev-chart { flex:1; min-width:0; height:100%; display:flex; flex-direction:column; }
   .ev-chart svg { flex:1; width:100%; min-height:0; }
 
+  /* --- Office heater (Tapo plug, via LodgyBox → /comfort/api/current) --- */
+  .ev-pair { grid-template-columns:1fr auto; }
+  #oh-card .body { flex-direction:column; justify-content:center; align-items:flex-start; gap:10px; }
+  .oh-state { display:flex; align-items:center; gap:16px; font-size:58px; font-weight:700; line-height:1; }
+  .oh-state .dot { width:36px; height:36px; }
+  .oh-state.on { color:var(--sun); }
+  .oh-state.on .dot { background:var(--sun); box-shadow:0 0 18px rgba(251,191,36,.7); }
+  #oh-kw { font-size:26px; font-weight:600; }
+  #oh-kw small { font-size:20px; color:var(--mute); font-weight:400; }
+  #oh-note { font-size:19px; }
+
   /* --- forecast --- */
   .fc { flex:1; display:grid; grid-template-columns:repeat(4,1fr); gap:12px; min-height:0; }
   .day { background:var(--card2); border-radius:12px; padding:10px 8px; text-align:center;
@@ -172,6 +183,8 @@
     .ev-stats .kw small, .ev-stats .kwh small { font-size:17px; }
     .pill { font-size:14px; }
     .ev-chart { height:110px; flex:none; }
+    .oh-state { font-size:40px; } .oh-state .dot { width:26px; height:26px; }
+    #oh-kw { font-size:20px; } #oh-note { font-size:15px; }
 
     .fc { gap:6px; }
     .day { padding:8px 2px; gap:2px; }
@@ -255,6 +268,7 @@
     </div>
     </div>
 
+    <div class="pair ev-pair">
     <div class="card" id="evc-card">
       <h2><svg class="i" viewBox="0 0 24 24"><path d="M5 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15M3 20h14M15 9h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-3-3M10 7l-2 4h4l-2 4"/></svg>EV charging</h2>
       <div class="body">
@@ -269,6 +283,16 @@
           <svg id="ev-spark" preserveAspectRatio="none"></svg>
         </div>
       </div>
+    </div>
+
+    <div class="card" id="oh-card">
+      <h2><svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 6v12M11 6v12M15 6v12M5 21v-3M19 21v-3"/></svg>Office heater</h2>
+      <div class="body">
+        <div class="oh-state" id="oh-state"><div class="dot"></div><span id="oh-text">--</span></div>
+        <div class="num" id="oh-kw"></div>
+        <div class="sub" id="oh-note">--</div>
+      </div>
+    </div>
     </div>
   </div>
 
@@ -597,6 +621,29 @@ async function pollHotWater(){
   }
 }
 
+/* Office heater: a Tapo plug at the lodge. LodgyBox pushes its state to the comfort app every minute. */
+async function pollOfficeHeater(){
+  try {
+    const {heaters, age_s} = await nf("/comfort/api/current");
+    const h = (heaters || {}).office;
+    if (!h || !h.available || h.on == null || age_s == null || age_s > 300) throw new Error("Office heater data unavailable");
+    $("oh-state").classList.toggle("on", h.on);
+    $("oh-text").textContent = h.on ? "ON" : "OFF";
+    const w = num(h.power_w);
+    $("oh-kw").innerHTML = w === null ? "" : `${(w < 20 ? 0 : w/1000).toFixed(1)} <small>kW</small>`;
+    $("oh-note").textContent = !h.on ? "Turns on with solar surplus"
+      : h.managed_by_surplus ? "Heating from solar surplus" : "Switched on by hand";
+    $("oh-card").classList.remove("stale");
+  } catch(e){
+    console.warn(e);
+    $("oh-state").classList.remove("on");
+    $("oh-text").textContent = "--";
+    $("oh-kw").textContent = "";
+    $("oh-note").textContent = "No data from the heater";
+    $("oh-card").classList.add("stale");
+  }
+}
+
 /* ---------------- forecast, fire, events ---------------- */
 async function pollExtras(){
   try {
@@ -663,6 +710,7 @@ tickClock(); setInterval(tickClock,15000);
 pollSoc(); setInterval(pollSoc,5000);
 pollEv(); setInterval(pollEv,10000);
 pollHotWater(); setInterval(pollHotWater,15000);
+pollOfficeHeater(); setInterval(pollOfficeHeater,30000);
 pollEvHistory(); setInterval(pollEvHistory,60000);
 pollExtras(); setInterval(pollExtras,60000);
 </script>

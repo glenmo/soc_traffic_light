@@ -7,7 +7,7 @@ keeps the latest text messages plus who has been heard. Only the few protobuf
 fields needed are decoded, so there is no dependency on the meshtastic package.
 
 Enabled only when mesh_psk.txt (base64 channel key) exists next to this file.
-/mesh and /api/mesh also need mesh_token.txt: they answer only with ?k=<token>.
+/mesh and /mesh/data also need mesh_token.txt: they answer only with ?k=<token>.
 """
 import base64
 import collections

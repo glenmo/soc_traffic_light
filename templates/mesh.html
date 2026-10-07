@@ -58,7 +58,7 @@ function when(t) {
 }
 async function poll() {
   try {
-    const r = await fetch("/api/mesh?k=" + encodeURIComponent(K), {cache:"no-store"});
+    const r = await fetch("/mesh/data?k=" + encodeURIComponent(K), {cache:"no-store"});
     if (!r.ok) throw new Error(r.status);
     const d = await r.json();
     document.getElementById("nodes").textContent = d.nodes_24h;

@@ -107,9 +107,9 @@ def test_mesh_routes_need_token():
     assert client.get("/mesh").status_code == 404  # no token configured: closed
     app.MESH.token = "s3cret"
     assert client.get("/mesh").status_code == 404
-    assert client.get("/api/mesh?k=wrong").status_code == 404
+    assert client.get("/mesh/data?k=wrong").status_code == 404
     assert client.get("/mesh?k=s3cret").status_code == 200
-    r = client.get("/api/mesh?k=s3cret")
+    r = client.get("/mesh/data?k=s3cret")
     assert r.status_code == 200 and "messages" in r.get_json()
 
 

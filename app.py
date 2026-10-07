@@ -307,7 +307,7 @@ def mesh_page():
     return render_template("mesh.html")
 
 
-@app.route("/api/mesh")
+@app.route("/mesh/data")
 def api_mesh():
     if not _mesh_allowed():
         abort(404)

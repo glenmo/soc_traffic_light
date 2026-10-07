@@ -145,10 +145,10 @@
   /* Landscape screens: laid out at 1920x1080 (drongo's size) and scaled to fit by fitKiosk(). */
   body.fit { position:absolute; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0; }
 
-  /* The / page (traffic light and what each colour means), faded in over the kiosk by cycleGuide(). */
-  #guide { position:absolute; inset:0; width:100%; height:100%; border:0; background:var(--bg);
-           opacity:0; pointer-events:none; transition:opacity .8s; z-index:10; }
-  #guide.show { opacity:1; }
+  /* The / page (traffic light guide) and, on drongo, /mesh, faded in over the kiosk by cycleViews(). */
+  .view { position:absolute; inset:0; width:100%; height:100%; border:0; background:var(--bg);
+          opacity:0; pointer-events:none; transition:opacity .8s; z-index:10; }
+  .view.show { opacity:1; }
 
   /* --- phones, narrow windows and portrait tablets: scrolling single column --- */
   @media (max-width: 900px), (orientation: portrait) {
@@ -704,16 +704,26 @@ function fitKiosk(){
 }
 addEventListener("resize", fitKiosk); fitKiosk();
 
-// Landscape (kiosk) screens alternate every 30 s with the / page. It stays loaded in an
-// iframe so both keep polling and the Pi never reloads a page just to switch.
-const GUIDE_MS = 30000;
-function cycleGuide(){
-  const f = document.createElement("iframe");
-  f.id = "guide"; f.src = "/"; f.title = "What the traffic light means"; f.tabIndex = -1;
-  document.body.appendChild(f);
-  setInterval(() => f.classList.toggle("show", !MOBILE.matches && !f.classList.contains("show")), GUIDE_MS);
+// Landscape (kiosk) screens rotate every 30 s: this page, the / guide, then /mesh when the URL
+// carries drongo's ?mesh=<token>. Views stay loaded in iframes so they keep polling.
+const VIEW_MS = 30000;
+function cycleViews(){
+  const views = [["/", "What the traffic light means"]];
+  const meshKey = new URLSearchParams(location.search).get("mesh");
+  if (meshKey) views.push(["/mesh?k=" + encodeURIComponent(meshKey), "Moora Moora mesh messages"]);
+  const frames = views.map(([src, title]) => {
+    const f = document.createElement("iframe");
+    f.className = "view"; f.src = src; f.title = title; f.tabIndex = -1;
+    document.body.appendChild(f);
+    return f;
+  });
+  let i = 0;  // 0 = this page, 1.. = frames
+  setInterval(() => {
+    i = (i + 1) % (frames.length + 1);
+    frames.forEach((f, n) => f.classList.toggle("show", !MOBILE.matches && n === i - 1));
+  }, VIEW_MS);
 }
-if (!MOBILE.matches) cycleGuide();
+if (!MOBILE.matches) cycleViews();
 
 drawBatteryShell(); drawGaugeShell(); drawTankShell();
 tickClock(); setInterval(tickClock,15000);

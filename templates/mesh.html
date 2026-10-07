@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moora Moora mesh</title>
+<style>
+  :root { --bg:#0e1116; --card:#171b22; --card2:#1f2530; --fg:#eef1f5; --mute:#8b95a5; --line:#2a313c;
+          --green:#22c55e; --orange:#f59e0b; --blue:#60a5fa; }
+  * { box-sizing:border-box; margin:0; }
+  html, body { height:100%; background:var(--bg); color:var(--fg); font-family:system-ui, sans-serif; overflow:hidden; }
+  body { position:absolute; left:0; top:0; width:1920px; height:1080px; transform-origin:0 0;
+         display:grid; grid-template-rows:64px 1fr 30px; padding:16px; gap:14px; }
+  header { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line);
+           font-size:30px; }
+  header .stat { font-size:22px; color:var(--mute); }
+  header .stat b { color:var(--fg); font-weight:600; }
+  main { display:flex; flex-direction:column; gap:14px; min-height:0; overflow:hidden; }
+  .msg { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:18px 24px;
+         display:grid; grid-template-columns:96px 1fr; gap:4px 22px; align-items:center; }
+  .msg:first-child { border-color:var(--blue); }
+  .badge { grid-row:span 2; width:96px; height:96px; border-radius:50%; background:var(--card2);
+           display:flex; align-items:center; justify-content:center; font-size:28px; font-weight:700; }
+  .who { font-size:22px; color:var(--mute); }
+  .who b { color:var(--fg); font-weight:600; margin-right:12px; }
+  .text { font-size:38px; line-height:1.25; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2;
+          -webkit-box-orient:vertical; overflow-wrap:anywhere; }
+  .empty { margin:auto; text-align:center; color:var(--mute); font-size:34px; line-height:1.6; }
+  footer { display:flex; justify-content:space-between; color:var(--mute); font-size:15px; }
+  .dot { display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--orange); margin-right:8px; }
+  .dot.ok { background:var(--green); }
+</style>
+</head>
+<body>
+<header>
+  <div>Moora Moora mesh &middot; <span style="color:var(--mute)">MooraMoora channel</span></div>
+  <div class="stat"><b id="nodes">–</b> radios heard in the last 24 h</div>
+</header>
+<main id="list"><div class="empty">Loading…</div></main>
+<footer>
+  <div><span id="dot" class="dot"></span><span id="conn">connecting</span></div>
+  <div>Messages sent on the MooraMoora Meshtastic channel</div>
+</footer>
+<script>
+const K = new URLSearchParams(location.search).get("k") || "";
+const COLOURS = ["#2563eb","#16a34a","#d97706","#9333ea","#db2777","#0891b2","#65a30d","#dc2626"];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const colour = id => COLOURS[parseInt(id.slice(-2), 16) % COLOURS.length];
+function ago(t, now) {
+  const m = Math.max(0, (now - t) / 60);
+  if (m < 1) return "just now";
+  if (m < 60) return Math.round(m) + " min ago";
+  if (m < 48 * 60) return Math.round(m / 60) + " h ago";
+  return new Date(t * 1000).toLocaleDateString("en-AU", {weekday:"short", day:"numeric", month:"short"});
+}
+function when(t) {
+  return new Date(t * 1000).toLocaleTimeString("en-AU", {hour:"numeric", minute:"2-digit"});
+}
+async function poll() {
+  try {
+    const r = await fetch("/api/mesh?k=" + encodeURIComponent(K), {cache:"no-store"});
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    document.getElementById("nodes").textContent = d.nodes_24h;
+    document.getElementById("dot").className = "dot" + (d.connected ? " ok" : "");
+    document.getElementById("conn").textContent = d.connected ? "connected to the mesh feed" : "mesh feed offline";
+    const list = document.getElementById("list");
+    list.innerHTML = d.messages.length ? d.messages.slice(0, 7).map(m => `
+      <div class="msg">
+        <div class="badge" style="background:${colour(m.from)}">${esc(m.short_name)}</div>
+        <div class="who"><b>${esc(m.long_name)}</b>${when(m.time)} &middot; ${ago(m.time, d.server_time)}</div>
+        <div class="text">${esc(m.text)}</div>
+      </div>`).join("")
+      : `<div class="empty">No messages yet on the MooraMoora channel.<br>New messages will appear here.</div>`;
+  } catch (e) {
+    document.getElementById("dot").className = "dot";
+    document.getElementById("conn").textContent = "can't reach the server";
+  }
+}
+function fit() {
+  const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+  document.body.style.transform = `translate(${(innerWidth - 1920 * s) / 2}px, ${(innerHeight - 1080 * s) / 2}px) scale(${s})`;
+}
+addEventListener("resize", fit); fit();
+poll(); setInterval(poll, 15000);
+</script>
+</body>
+</html>

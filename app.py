@@ -27,15 +27,17 @@ Typical deployment:
 """
 
 import argparse
+import hmac
 import logging
 import threading
 import time
 from datetime import datetime, timezone
 
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, abort, jsonify, render_template, request
 
 from extras import Extras  # Lodge kiosk: forecast, fire danger, events
+from mesh import Mesh  # Lodge kiosk: MooraMoora Meshtastic channel messages
 
 # --------------------------------------------------------------------------- #
 # Logging
@@ -219,6 +221,7 @@ class UpstreamPoller:
 
 POLLER: UpstreamPoller = None  # filled in by main()
 EXTRAS = Extras()  # started in main()
+MESH = Mesh()  # started in main()
 
 
 # --------------------------------------------------------------------------- #
@@ -291,6 +294,26 @@ def api_extras():
     return jsonify(EXTRAS.snapshot())
 
 
+def _mesh_allowed():
+    """/mesh is for drongo only: it must present the token from mesh_token.txt."""
+    k = request.args.get("k", "")
+    return bool(MESH.token) and hmac.compare_digest(k.encode(), MESH.token.encode())
+
+
+@app.route("/mesh")
+def mesh_page():
+    if not _mesh_allowed():
+        abort(404)
+    return render_template("mesh.html")
+
+
+@app.route("/api/mesh")
+def api_mesh():
+    if not _mesh_allowed():
+        abort(404)
+    return jsonify(MESH.snapshot())
+
+
 @app.route("/kiosk")
 @app.route("/kiosk/")
 def kiosk():
@@ -340,6 +363,7 @@ def main():
     )
     POLLER.start()
     EXTRAS.start()
+    MESH.start()
 
     log.info("SOC Traffic Light listening on %s:%d (upstream=%s)",
              args.host, args.port, args.upstream)

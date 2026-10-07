@@ -176,12 +176,34 @@ a wall display:
 - Front-end watchdog: `location.reload()` if no successful fetch arrives for 2 min.
 - Meta-refresh backstop: hard-reloads the page every 15 min regardless.
 
+## Lodge kiosk: MooraMoora mesh page
+
+On drongo the `/kiosk` page rotates every 30 s through three views: the kiosk, the `/` guide, and
+`/mesh`, which lists recent text messages on the MooraMoora Meshtastic channel and how many radios
+were heard in the last 24 h. Anyone else opening `/kiosk` gets only the first two.
+
+`mesh.py` subscribes to `msh/ANZ/2/e/MooraMoora/#` on `mqtt.meshtastic.org` and decrypts the packets
+with the channel key. Messages appear only if a radio at Moora Moora uplinks that channel to MQTT.
+The latest 30 messages and the node names are kept in `mesh_state.json`, so a restart doesn't blank
+the page.
+
+Two files next to `app.py` configure it. Both are git-ignored and should be mode 600:
+
+| File | Contents |
+|---|---|
+| `mesh_psk.txt` | The channel key in base64, as in the channel URL. Without it the feed is off. |
+| `mesh_token.txt` | A random token. `/mesh` and `/api/mesh` answer only with `?k=<token>` and return 404 otherwise, including when this file is missing. |
+
+drongo opens `/kiosk?mesh=<token>`; its `autostart` reads the token from `~/.config/kiosk-mesh-token`.
+Tests: `venv/bin/python -m pytest tests/test_mesh.py`.
+
 ## Files
 
 ```
 soc_traffic_light/
 ├── app.py                  # Flask app + upstream poller
-├── requirements.txt        # flask, requests
+├── mesh.py                 # MooraMoora channel feed for the kiosk's /mesh page
+├── requirements.txt        # flask, requests, paho-mqtt, cryptography
 ├── install.sh              # venv + systemd installer
 ├── templates/
 │   └── index.html          # the traffic-light page

@@ -100,17 +100,37 @@ def test_feed_names_dedup_and_persist():
         assert again["messages"][0]["text"] == "Test from the M1"
 
 
+def test_token_viewer_file_formats():
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "tokens")
+        assert mesh.token_viewer("anything", path) is None  # no file: closed
+        with open(path, "w") as f:
+            f.write("# viewers\ndrongo aaa111\n\nglen bbb222  # phone\nccc333\n")
+        assert mesh.token_viewer("aaa111", path) == "drongo"
+        assert mesh.token_viewer("bbb222", path) == "glen"
+        assert mesh.token_viewer("ccc333", path) == "viewer5"
+        assert mesh.token_viewer("drongo", path) is None  # a name is not a token
+        assert mesh.token_viewer("", path) is None
+        assert mesh.token_viewer("aaa11", path) is None
+
+
 def test_mesh_routes_need_token():
     import app
     client = app.app.test_client()
-    app.MESH.token = None
-    assert client.get("/mesh").status_code == 404  # no token configured: closed
-    app.MESH.token = "s3cret"
-    assert client.get("/mesh").status_code == 404
-    assert client.get("/mesh/data?k=wrong").status_code == 404
-    assert client.get("/mesh?k=s3cret").status_code == 200
-    r = client.get("/mesh/data?k=s3cret")
-    assert r.status_code == 200 and "messages" in r.get_json()
+    with tempfile.TemporaryDirectory() as tmp:
+        mesh.TOKEN_FILE = os.path.join(tmp, "mesh_token.txt")
+        assert client.get("/mesh").status_code == 404  # no token file: closed
+        with open(mesh.TOKEN_FILE, "w") as f:
+            f.write("drongo s3cret\nglen phone-token\n")
+        assert client.get("/mesh").status_code == 404
+        assert client.get("/mesh/data?k=wrong").status_code == 404
+        assert client.get("/mesh?k=s3cret").status_code == 200
+        assert client.get("/mesh?k=phone-token").status_code == 200
+        r = client.get("/mesh/data?k=s3cret")
+        assert r.status_code == 200 and "messages" in r.get_json()
+        with open(mesh.TOKEN_FILE, "w") as f:
+            f.write("drongo s3cret\n")  # glen revoked: takes effect without a restart
+        assert client.get("/mesh?k=phone-token").status_code == 404
 
 
 if __name__ == "__main__":

@@ -7,10 +7,13 @@ keeps the latest text messages plus who has been heard. Only the few protobuf
 fields needed are decoded, so there is no dependency on the meshtastic package.
 
 Enabled only when mesh_psk.txt (base64 channel key) exists next to this file.
-/mesh and /mesh/data also need mesh_token.txt: they answer only with ?k=<token>.
+/mesh and /mesh/data answer only with ?k=<token>, checked against mesh_token.txt:
+one viewer per line, "<name> <token>" (or a bare token). It is re-read on every
+request, so viewers are added or revoked without a restart.
 """
 import base64
 import collections
+import hmac
 import json
 import logging
 import os
@@ -38,6 +41,23 @@ def read_secret(path):
             return f.read().strip() or None
     except OSError:
         return None
+
+
+def token_viewer(k, path=None):
+    """Name of the viewer whose token is k, or None. No file, or no match, means no access."""
+    try:
+        with open(path or TOKEN_FILE) as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None
+    for n, line in enumerate(lines):
+        parts = line.split("#", 1)[0].split()
+        if not parts:
+            continue
+        name, tok = (parts[0], parts[1]) if len(parts) > 1 else (f"viewer{n + 1}", parts[0])
+        if k and hmac.compare_digest(k.encode(), tok.encode()):
+            return name
+    return None
 
 
 def channel_key(b64):
@@ -122,7 +142,6 @@ def decode_envelope(payload, key):
 class Mesh:
     def __init__(self):
         self.enabled = False
-        self.token = None
         self._lock = threading.Lock()
         self._messages = collections.deque(maxlen=MAX_MESSAGES)
         self._names = {}       # "!xxxxxxxx" -> [long, short]
@@ -149,7 +168,6 @@ class Mesh:
 
     def start(self):
         psk = read_secret(PSK_FILE)
-        self.token = read_secret(TOKEN_FILE)
         if not psk:
             log.info("mesh: %s missing, MooraMoora feed disabled", PSK_FILE)
             return

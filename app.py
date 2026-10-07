@@ -27,7 +27,6 @@ Typical deployment:
 """
 
 import argparse
-import hmac
 import logging
 import threading
 import time
@@ -37,7 +36,7 @@ import requests
 from flask import Flask, abort, jsonify, render_template, request
 
 from extras import Extras  # Lodge kiosk: forecast, fire danger, events
-from mesh import Mesh  # Lodge kiosk: MooraMoora Meshtastic channel messages
+from mesh import Mesh, token_viewer  # Lodge kiosk: MooraMoora Meshtastic channel messages
 
 # --------------------------------------------------------------------------- #
 # Logging
@@ -295,9 +294,8 @@ def api_extras():
 
 
 def _mesh_allowed():
-    """/mesh is for drongo only: it must present the token from mesh_token.txt."""
-    k = request.args.get("k", "")
-    return bool(MESH.token) and hmac.compare_digest(k.encode(), MESH.token.encode())
+    """/mesh is only for viewers listed in mesh_token.txt (drongo, and people given a token)."""
+    return token_viewer(request.args.get("k", "")) is not None
 
 
 @app.route("/mesh")

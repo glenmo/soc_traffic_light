@@ -192,11 +192,12 @@ Two files next to `app.py` configure it. Both are git-ignored and should be mode
 | File | Contents |
 |---|---|
 | `mesh_psk.txt` | The channel key in base64, as in the channel URL. Without it the feed is off. |
-| `mesh_token.txt` | A random token. `/mesh` and `/mesh/data` answer only with `?k=<token>` and return 404 otherwise, including when this file is missing. |
+| `mesh_token.txt` | One viewer per line, `<name> <token>` (e.g. `drongo …`, `glen …`). `/mesh` and `/mesh/data` answer only with `?k=<token>` and return 404 otherwise, including when this file is missing. It is re-read on every request, so add or delete a line to grant or revoke access without a restart. |
 
 The data endpoint is `/mesh/data`, not under `/api/`: pignus's Apache sends `/api/` to the advanced dashboard on port 8100.
 
 drongo opens `/kiosk?mesh=<token>`; its `autostart` reads the token from `~/.config/kiosk-mesh-token`.
+Anyone else with a token opens `/mesh?k=<token>` directly; on a phone the page switches to a scrolling layout.
 Tests: `venv/bin/python -m pytest tests/test_mesh.py`.
 
 ## Files

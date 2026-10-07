@@ -29,6 +29,21 @@
   footer { display:flex; justify-content:space-between; color:var(--mute); font-size:15px; }
   .dot { display:inline-block; width:12px; height:12px; border-radius:50%; background:var(--orange); margin-right:8px; }
   .dot.ok { background:var(--green); }
+  /* phones and portrait screens: normal scrolling page instead of the scaled 1920x1080 layout */
+  @media (max-width: 900px), (orientation: portrait) {
+    html, body { overflow:auto; }
+    body { position:static; width:auto; height:auto; min-height:100%; transform:none !important;
+           display:block; padding:12px; }
+    header { flex-direction:column; align-items:flex-start; gap:4px; font-size:22px; padding-bottom:10px; margin-bottom:12px; }
+    header .stat { font-size:16px; }
+    main { gap:10px; overflow:visible; }
+    .msg { grid-template-columns:52px 1fr; padding:12px 14px; gap:2px 12px; }
+    .badge { width:52px; height:52px; font-size:16px; }
+    .who { font-size:14px; }
+    .text { font-size:19px; -webkit-line-clamp:unset; }
+    .empty { font-size:20px; margin-top:40px; }
+    footer { flex-direction:column; gap:4px; margin-top:16px; font-size:13px; }
+  }
 </style>
 </head>
 <body>
@@ -65,7 +80,7 @@ async function poll() {
     document.getElementById("dot").className = "dot" + (d.connected ? " ok" : "");
     document.getElementById("conn").textContent = d.connected ? "connected to the mesh feed" : "mesh feed offline";
     const list = document.getElementById("list");
-    list.innerHTML = d.messages.length ? d.messages.slice(0, 7).map(m => `
+    list.innerHTML = d.messages.length ? d.messages.slice(0, NARROW.matches ? 30 : 7).map(m => `
       <div class="msg">
         <div class="badge" style="background:${colour(m.from)}">${esc(m.short_name)}</div>
         <div class="who"><b>${esc(m.long_name)}</b>${when(m.time)} &middot; ${ago(m.time, d.server_time)}</div>
@@ -77,7 +92,9 @@ async function poll() {
     document.getElementById("conn").textContent = "can't reach the server";
   }
 }
+const NARROW = matchMedia("(max-width: 900px), (orientation: portrait)");
 function fit() {
+  if (NARROW.matches) { document.body.style.transform = ""; return; }
   const s = Math.min(innerWidth / 1920, innerHeight / 1080);
   document.body.style.transform = `translate(${(innerWidth - 1920 * s) / 2}px, ${(innerHeight - 1080 * s) / 2}px) scale(${s})`;
 }

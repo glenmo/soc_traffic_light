@@ -30,6 +30,8 @@ STATE_FILE = os.path.join(HERE, "mesh_state.json")
 BROKER, PORT, USER, PASSWORD = "mqtt.meshtastic.org", 1883, "meshdev", "large4cats"
 CHANNEL = "MooraMoora"
 TOPIC = f"msh/ANZ/2/e/{CHANNEL}/#"
+# Radios with public LongFast as primary (the M6) send their NodeInfo only there.
+NAMES_TOPIC = "msh/ANZ/2/e/LongFast/#"
 TEXT_APP, NODEINFO_APP = 1, 4
 DEFAULT_PSK = bytes.fromhex("d4f1bb3a20290759f0bcffabcf4e6901")  # firmware's default key, index 1
 MAX_MESSAGES = 30
@@ -180,8 +182,8 @@ class Mesh:
 
         def on_connect(cl, u, f, rc, p):
             self._connected = not rc.is_failure
-            log.info("mesh: MQTT connected rc=%s, subscribing %s", rc, TOPIC)
-            cl.subscribe(TOPIC)
+            log.info("mesh: MQTT connected rc=%s, subscribing %s, %s", rc, TOPIC, NAMES_TOPIC)
+            cl.subscribe([(TOPIC, 0), (NAMES_TOPIC, 0)])
 
         def on_disconnect(cl, u, f, rc, p):
             self._connected = False
@@ -193,12 +195,13 @@ class Mesh:
         self._client = c
 
     def _on_message(self, cl, u, msg):
+        names_only = msg.topic.startswith(NAMES_TOPIC[:-1])
         try:
-            p = decode_envelope(msg.payload, self._key)
+            p = decode_envelope(msg.payload, DEFAULT_PSK if names_only else self._key)
         except Exception as e:
             log.debug("mesh: undecodable %s: %s", msg.topic, e)
             return
-        if not p:
+        if not p or (names_only and p["portnum"] != NODEINFO_APP):
             return
         key = (p["from"], p["id"])
         if key in self._seen:  # the same packet arrives once per gateway
@@ -208,7 +211,10 @@ class Mesh:
             self._seen.popitem(last=False)
         nid, now = "!%08x" % p["from"], time.time()
         with self._lock:
-            self._heard[nid] = now
+            if names_only and nid not in self._heard:  # only name nodes heard on MooraMoora
+                return
+            if not names_only:
+                self._heard[nid] = now
             changed = False
             if p["portnum"] == NODEINFO_APP:
                 user = pb_fields(p["payload"])

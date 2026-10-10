@@ -73,8 +73,8 @@ def test_default_key_expansion():
 
 
 class FakeMsg:
-    def __init__(self, payload):
-        self.payload, self.topic = payload, "msh/ANZ/2/e/MooraMoora/!85d7c1d3"
+    def __init__(self, payload, topic="msh/ANZ/2/e/MooraMoora/!85d7c1d3"):
+        self.payload, self.topic = payload, topic
 
 
 def fresh_mesh(tmp):
@@ -98,6 +98,28 @@ def test_feed_names_dedup_and_persist():
         assert s["messages"][0]["long_name"] == "SmartEnergyLab-Base" and s["messages"][0]["short_name"] == "SELb"
         again = fresh_mesh(tmp).snapshot()  # reloaded from the state file after a restart
         assert again["messages"][0]["text"] == "Test from the M1"
+
+
+def test_names_from_longfast_for_moora_nodes_only():
+    """The M6 has public LongFast as primary, so its NodeInfo never reaches the MooraMoora topic.
+    Names come from LongFast (default key) for nodes heard on MooraMoora; LongFast text,
+    and names of nodes never heard on MooraMoora, are ignored."""
+    lf = "msh/ANZ/2/e/LongFast/!6bdc20b2"
+    m6, stranger = 0x6BDC20B2, 0x11112222
+    with tempfile.TemporaryDirectory() as tmp:
+        m = fresh_mesh(tmp)
+        m._on_message(None, None, FakeMsg(envelope(mesh.TEXT_APP, b"hi coop", frm=m6, pid=10)))
+        assert m.snapshot()["messages"][0]["short_name"] == "20b2"
+        user = ld(2, b"MooraMoora-Base") + ld(3, b"MMR1")
+        m._on_message(None, None, FakeMsg(envelope(mesh.NODEINFO_APP, user, key=mesh.DEFAULT_PSK, frm=m6, pid=11), lf))
+        m._on_message(None, None, FakeMsg(envelope(mesh.NODEINFO_APP, ld(2, b"Far") + ld(3, b"FAR"),
+                                                   key=mesh.DEFAULT_PSK, frm=stranger, pid=12), lf))
+        m._on_message(None, None, FakeMsg(envelope(mesh.TEXT_APP, b"public chat", key=mesh.DEFAULT_PSK,
+                                                   frm=m6, pid=13), lf))
+        s = m.snapshot()
+        assert [x["text"] for x in s["messages"]] == ["hi coop"] and s["nodes_24h"] == 1
+        assert s["messages"][0]["long_name"] == "MooraMoora-Base" and s["messages"][0]["short_name"] == "MMR1"
+        assert "!11112222" not in m._names
 
 
 def test_token_viewer_file_formats():

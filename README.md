@@ -178,9 +178,11 @@ a wall display:
 
 ## Lodge kiosk: MooraMoora mesh page
 
-On drongo the `/kiosk` page rotates every 30 s through three views: the kiosk, the `/` guide, and
-`/mesh`, which lists recent text messages on the MooraMoora Meshtastic channel and how many radios
-were heard in the last 24 h. Anyone else opening `/kiosk` gets only the first two.
+On drongo the `/kiosk` page rotates every 30 s through four views: the kiosk, the `/` guide,
+`/weather/` (the Lodge weather page: SMA Meteostation readings, a 24 h trend and a 7-day forecast,
+served by `weather_monitor` in the microgrid_remote_monitor repo), and `/mesh`, which lists recent
+text messages on the MooraMoora Meshtastic channel and how many radios were heard in the last 24 h.
+Anyone else opening `/kiosk` gets only the first three.
 
 `mesh.py` subscribes to `msh/ANZ/2/e/MooraMoora/#` on `mqtt.meshtastic.org` and decrypts the packets
 with the channel key. Messages appear only if a radio at Moora Moora uplinks that channel to MQTT.

@@ -28,6 +28,7 @@ Typical deployment:
 
 import argparse
 import logging
+import re
 import threading
 import time
 from datetime import datetime, timezone
@@ -46,6 +47,21 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
 log = logging.getLogger("soc_traffic_light")
+
+
+class _RedactToken(logging.Filter):
+    """Keep /mesh viewer tokens (?k=...) out of Werkzeug's request log."""
+
+    _k = re.compile(r"([?&]k=)[^&\s\"]+")
+
+    def filter(self, record):
+        if record.args:
+            record.args = tuple(self._k.sub(r"\1REDACTED", a) if isinstance(a, str) else a
+                                for a in record.args)
+        return True
+
+
+logging.getLogger("werkzeug").addFilter(_RedactToken())
 
 # --------------------------------------------------------------------------- #
 # Flask app

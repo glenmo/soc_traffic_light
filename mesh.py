@@ -199,8 +199,10 @@ class Mesh:
         try:
             p = decode_envelope(msg.payload, DEFAULT_PSK if names_only else self._key)
         except Exception as e:
-            log.debug("mesh: undecodable %s: %s", msg.topic, e)
+            (log.debug if names_only else log.warning)("mesh: undecodable %s: %r", msg.topic, e)
             return
+        if not p and not names_only:
+            log.warning("mesh: dropped %s (%d bytes): no decodable packet", msg.topic, len(msg.payload))
         if not p or (names_only and p["portnum"] != NODEINFO_APP):
             return
         key = (p["from"], p["id"])

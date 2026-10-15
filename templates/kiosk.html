@@ -452,6 +452,7 @@ const WMO = {0:["clear","Clear"],1:["clear","Mostly clear"],2:["partly","Partly 
   73:["snow","Snow"],75:["snow","Heavy snow"],77:["snow","Snow"],80:["showers","Showers"],81:["showers","Showers"],
   82:["showers","Heavy showers"],85:["snow","Snow showers"],86:["snow","Snow showers"],95:["storm","Storms"],
   96:["storm","Storms, hail"],99:["storm","Storms, hail"]};
+const DAY_DESC = {0:"Sunny", 1:"Mostly sunny"};  // daytime wording for forecast days; "now" keeps WMO's
 const wxIcon = code => `<svg class="i wx" viewBox="0 0 24 24" style="stroke-width:1.6">${WX[(WMO[code]||["cloudy"])[0]]}</svg>`;
 
 /* ---------------- traffic light ---------------- */
@@ -665,7 +666,7 @@ async function pollExtras(){
       $("fc-now").textContent = "· now " + deg(f.now_temp) + "° " + ((WMO[f.now_code]||[])[1]||"");
       $("fc-days").innerHTML = f.days.map((d,i)=>`<div class="day${i?"":" today"}">
           <div class="dn">${i ? dayName(d.date) : "Today"}</div>${wxIcon(d.code)}
-          <div class="desc">${(WMO[d.code]||[,""])[1]}</div>
+          <div class="desc">${DAY_DESC[d.code] || (WMO[d.code]||[,""])[1]}</div>
           <div class="t num">${deg(d.max)}° <span>${deg(d.min)}°</span></div>
           <div class="rain num">${d.rain_pct==null ? "&nbsp;" : "💧 " + d.rain_pct + "%"}</div></div>`).join("");
     }

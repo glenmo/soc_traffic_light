@@ -49,6 +49,17 @@ REFRESH_SECS = 15 * 60
 RETRY_SECS = 2 * 60                  # after a failed fetch, try again sooner
 
 
+def day_code(code, rain_pct, rain_mm, cloud):
+    """Weather code for a day's icon. Open-Meteo's daily weather_code is the worst hour, so one hour
+    of 0.1 mm drizzle makes a sunny day "Drizzle". Keep a wet code only when the day is actually
+    forecast wet (>= 30 % chance and >= 1 mm); otherwise pick from mean cloud cover. Same rule as
+    weather_monitor in microgrid_remote_monitor."""
+    wet = (rain_pct is None or rain_pct >= 30) and rain_mm is not None and rain_mm >= 1
+    if code is None or (code >= 45 and wet) or cloud is None:
+        return code
+    return 0 if cloud < 20 else 1 if cloud < 45 else 2 if cloud < 75 else 3
+
+
 class Extras:
     def __init__(self):
         self._lock = threading.Lock()
@@ -101,7 +112,8 @@ class Extras:
             params={
                 "latitude": LAT, "longitude": LON, "timezone": TZ,
                 "current": "temperature_2m,weather_code,precipitation",
-                "daily": "temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max",
+                "daily": "temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max,"
+                         "precipitation_sum,cloud_cover_mean",
                 "forecast_days": 4,
                 # models=bom_access_global returns all nulls for this location,
                 # so use Open-Meteo's default blend.
@@ -116,7 +128,10 @@ class Extras:
                 "date": d,
                 "min": j["daily"]["temperature_2m_min"][i],
                 "max": j["daily"]["temperature_2m_max"][i],
-                "code": j["daily"]["weather_code"][i],
+                "code": day_code(j["daily"]["weather_code"][i],
+                                 j["daily"]["precipitation_probability_max"][i],
+                                 j["daily"]["precipitation_sum"][i],
+                                 j["daily"]["cloud_cover_mean"][i]),
                 "rain_pct": j["daily"]["precipitation_probability_max"][i],
             })
         return {

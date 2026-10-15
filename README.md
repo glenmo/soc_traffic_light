@@ -74,8 +74,8 @@ On pignus the existing `server_app.py` already runs on `:8100`, so just
 point this app at localhost:
 
 ```bash
-git clone <this repo> /opt/soc_traffic_light
-cd /opt/soc_traffic_light
+git clone <this repo> ~/soc_traffic_light
+cd ~/soc_traffic_light
 sudo bash install.sh --upstream http://localhost:8100 --port 8080
 ```
 

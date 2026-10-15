@@ -726,7 +726,8 @@ function cycleViews(){
     frames.forEach((f, n) => f.classList.toggle("show", !MOBILE.matches && n === i - 1));
   }, VIEW_MS);
 }
-if (!MOBILE.matches) cycleViews();
+// Not when framed (the tile previews on the / page): there it shows just the kiosk itself.
+if (!MOBILE.matches && window.top === window) cycleViews();
 
 drawBatteryShell(); drawGaugeShell(); drawTankShell();
 tickClock(); setInterval(tickClock,15000);

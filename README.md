@@ -176,6 +176,15 @@ a wall display:
 - Front-end watchdog: `location.reload()` if no successful fetch arrives for 2 min.
 - Meta-refresh backstop: hard-reloads the page every 15 min regardless.
 
+## Public front page (`/`)
+
+`https://monitor.mooramoora.org.au/` is `templates/home.html` (route `/home`; pignus's Apache
+sends exactly `/` there with a `ProxyPassMatch`). It shows a live, scaled preview tile of each
+public screen in the kiosk rotation (`/kiosk`, `/weather/`, `/basic/`), each linking to the page.
+`/mesh` is left out because it needs a viewer token. Framed in a tile, `/kiosk` skips its own
+rotation. The password-protected tile page of every web app on pignus (web-index.service) is at
+`/overview/`.
+
 ## Lodge kiosk: MooraMoora mesh page
 
 On drongo the `/kiosk` page rotates every 30 s through four views: the kiosk,

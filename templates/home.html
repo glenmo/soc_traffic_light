@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moora Moora Lodge</title>
+<style>
+  :root { --bg:#0e1116; --card:#171b22; --fg:#eef1f5; --mute:#8b95a5; --line:#2a313c; --blue:#60a5fa; }
+  * { box-sizing:border-box; margin:0; }
+  html, body { background:var(--bg); color:var(--fg); font-family:system-ui, sans-serif; }
+  body { max-width:1400px; margin:0 auto; padding:24px; }
+  header { display:flex; align-items:baseline; justify-content:space-between; gap:8px 16px; flex-wrap:wrap;
+           padding-bottom:12px; margin-bottom:20px; border-bottom:1px solid var(--line); }
+  h1 { font-size:24px; font-weight:600; }
+  header p { color:var(--mute); font-size:14px; }
+  main { display:grid; gap:20px; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); }
+  a.tile { display:block; background:var(--card); border:1px solid var(--line); border-radius:14px;
+           overflow:hidden; color:inherit; text-decoration:none;
+           transition:transform .12s ease, border-color .12s ease, box-shadow .12s ease; }
+  a.tile:hover, a.tile:focus-visible { transform:translateY(-2px); border-color:var(--blue);
+           box-shadow:0 8px 24px rgba(0,0,0,.35); outline:none; }
+  /* Live preview: the real page laid out at 1920x1080 (the kiosk screen) and scaled to the tile. */
+  .preview { position:relative; aspect-ratio:16 / 9; overflow:hidden; background:var(--bg);
+             border-bottom:1px solid var(--line); }
+  .preview iframe { position:absolute; left:0; top:0; width:1920px; height:1080px; border:0;
+                    transform-origin:0 0; pointer-events:none; }
+  .info { padding:12px 16px; }
+  .name { font-weight:600; font-size:17px; }
+  .where { color:var(--mute); font-size:13px; margin-top:2px; }
+  @media (max-width:520px) {
+    body { padding:16px; }
+    main { grid-template-columns:1fr; gap:14px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Moora Moora Lodge</h1>
+  <p>The screens shown on the Lodge kiosk</p>
+</header>
+<main>
+  <a class="tile" href="/kiosk">
+    <div class="preview"><iframe src="/kiosk" title="Lodge kiosk preview" loading="lazy" tabindex="-1"></iframe></div>
+    <div class="info"><div class="name">Lodge kiosk</div><div class="where">monitor.mooramoora.org.au/kiosk</div></div>
+  </a>
+  <a class="tile" href="/weather/">
+    <div class="preview"><iframe src="/weather/" title="Lodge weather preview" loading="lazy" tabindex="-1"></iframe></div>
+    <div class="info"><div class="name">Lodge weather</div><div class="where">monitor.mooramoora.org.au/weather/</div></div>
+  </a>
+  <a class="tile" href="/basic/">
+    <div class="preview"><iframe src="/basic/" title="Battery state of charge preview" loading="lazy" tabindex="-1"></iframe></div>
+    <div class="info"><div class="name">Battery state of charge</div><div class="where">monitor.mooramoora.org.au/basic/</div></div>
+  </a>
+</main>
+<script>
+// Scale each 1920x1080 preview to its tile's width.
+const ro = new ResizeObserver(entries => {
+  for (const e of entries) e.target.firstElementChild.style.transform = `scale(${e.contentRect.width / 1920})`;
+});
+document.querySelectorAll(".preview").forEach(p => ro.observe(p));
+</script>
+</body>
+</html>

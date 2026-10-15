@@ -328,6 +328,14 @@ def api_mesh():
     return jsonify(MESH.snapshot())
 
 
+@app.route("/home")
+def home():
+    """Public tile page at https://monitor.mooramoora.org.au/ (Apache sends exactly / here):
+    a live preview of each screen in the Lodge kiosk rotation, linking to it. /mesh is left
+    out because it needs a viewer token."""
+    return render_template("home.html")
+
+
 @app.route("/kiosk")
 @app.route("/kiosk/")
 def kiosk():

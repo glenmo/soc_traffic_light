@@ -178,11 +178,12 @@ a wall display:
 
 ## Lodge kiosk: MooraMoora mesh page
 
-On drongo the `/kiosk` page rotates every 30 s through three views: the kiosk,
+On drongo the `/kiosk` page rotates every 30 s through four views: the kiosk,
 `/weather/` (the Lodge weather page: SMA Meteostation readings, a 24 h trend and a 7-day forecast,
-served by `weather_monitor` in the microgrid_remote_monitor repo), and `/mesh`, which lists recent
+served by `weather_monitor` in the microgrid_remote_monitor repo), `/basic/` (the Wombat Hollow
+Microgrid battery state of charge page), and `/mesh`, which lists recent
 text messages on the MooraMoora Meshtastic channel and how many radios were heard in the last 24 h.
-Anyone else opening `/kiosk` gets only the first two. The `/` guide is no longer in the rotation
+Anyone else opening `/kiosk` gets only the first three. The `/` guide is no longer in the rotation
 because `/` now requires a password.
 
 `mesh.py` subscribes to `msh/ANZ/2/e/MooraMoora/#` on `mqtt.meshtastic.org` and decrypts the packets

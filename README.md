@@ -65,8 +65,16 @@ cd ~/soc_traffic_light
 sudo bash install.sh --upstream http://localhost:8100 --port 8765 --site-name "Wombat Hollow Microgrid"
 ```
 
-desky also runs an old LAN copy (`--upstream http://rubberduck.local:5000`, port 8765) that is
-still at the initial commit and isn't updated by the steps above.
+desky also runs a LAN copy at `http://desky.local:8765/` (`--upstream http://rubberduck.local:5000`).
+To update it:
+
+```bash
+ssh desky 'cd ~/soc_traffic_light && git pull --ff-only && venv/bin/pip install -q -r requirements.txt \
+  && kill $(systemctl show -p MainPID --value soc-traffic-light.service)'
+```
+
+(`glen` has no passwordless sudo there; the unit runs as `glen` with `Restart=always`, so killing
+the process restarts it on the new code.)
 
 ## CLI options
 

@@ -29,8 +29,6 @@ ssh pignus 'cd ~/soc_traffic_light && git pull --ff-only && sudo systemctl resta
 
 Restart even for template-only changes, because Flask caches templates. drongo picks up kiosk changes on the page's 15-minute self-reload (repo `drongo-kiosk` covers restarting its Chromium sooner). desky also runs a LAN copy in `~/soc_traffic_light` (port 8765, upstream `rubberduck.local:5000`). Update it with `git pull` there, plus `venv/bin/pip install -r requirements.txt` if the requirements changed. `glen` has no passwordless sudo on desky, but the unit runs as `glen` with `Restart=always`, so `kill $(systemctl show -p MainPID --value soc-traffic-light.service)` restarts it. `/kiosk` there lacks the EV, hot water and heater data, because those come from other apps behind pignus's Apache.
 
-The README's quick-start and Apache sections predate this setup (port 8080, `/soc/`). Trust the live unit and vhost over them.
-
 ## Testing
 
 No test runner config. With a venv holding `requirements.txt` plus pytest:

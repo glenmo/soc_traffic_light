@@ -4,7 +4,7 @@
 #
 # Usage:
 #   sudo bash install.sh                     # desky.local default — upstream=rubberduck.local:5000
-#   sudo bash install.sh --upstream http://localhost:8100 --port 8080   # pignus mirror
+#   sudo bash install.sh --upstream http://localhost:8100 --port 8765 --site-name "Wombat Hollow Microgrid"   # pignus
 #
 # After install:
 #   sudo systemctl status  soc-traffic-light.service

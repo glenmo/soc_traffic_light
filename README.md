@@ -1,49 +1,32 @@
 # SOC Traffic Light
 
-A minimal, glanceable status page for the Mooramoora microgrid battery SOC.
+The Flask app behind most of the public pages on **https://monitor.mooramoora.org.au/**:
+the battery traffic light (`/basic/`), the Lodge kiosk (`/kiosk`), the public front page (`/`)
+and the MooraMoora mesh page (`/mesh`). It runs on pignus; see `CLAUDE.md` for a map of
+routes, data sources and constraints.
 
-Two coloured circles (SP Pro and Solis) — green / orange / red — plus the
-SOC %, battery charge/discharge direction, and a small last-updated stamp.
-Designed to be readable from across the room on a wall-mounted tablet or
-old monitor.
-
-```
-   ┌────────────────────┐   ┌────────────────────┐
-   │       SP PRO       │   │       SOLIS        │
-   │                    │   │                    │
-   │       ●  82%       │   │       ●  79%       │
-   │                    │   │                    │
-   │   ▲ 3.4 kW         │   │   ▼ 1.1 kW         │
-   │     charging       │   │     discharging    │
-   │                    │   │                    │
-   │   updated 4s ago   │   │   updated 5s ago   │
-   └────────────────────┘   └────────────────────┘
-
-         Green ≥70 %     Orange 40–70 %     Red <40 %
-```
+The traffic light is a glanceable status page for the Wombat Hollow microgrid batteries: one
+green / orange / red light, the guidance for each colour, and the SP Pro and Solis SoC with
+charge or discharge power. It's meant to be readable from across the room and left running
+for weeks on a wall display.
 
 ## How it works
 
-This app does **not** poll any inverters directly. Instead, it fetches the
-existing JSON endpoints from your `microgrid_remote_monitor` Flask app
-(rubberduck on the LAN, pignus on the internet) and re-renders the SOC
-fields as a traffic light.
+This app does **not** poll any inverters directly. A background thread fetches the JSON
+endpoints of the existing `microgrid_remote_monitor` app every 5 s and turns the SoCs into
+a traffic light.
 
 ```
-   rubberduck.local:5000          (existing app — polls Solis + SP Pro)
+   server_app.py on pignus :8100     (microgrid_remote_monitor; data pushed from rubberduck)
             │
             │  GET /api/sppro/data
             │  GET /api/solis/data
             ▼
-   desky.local:8080   ←─────── soc_traffic_light/app.py
+   soc_traffic_light/app.py on pignus :8765
             │
             ▼
-       browser on tablet / wall display
+   Apache, monitor.mooramoora.org.au  →  browsers, drongo's kiosk screen
 ```
-
-The same code runs on `pignus.arachnoid.net.au` for the internet-facing
-mirror; it just points at a different upstream (`http://localhost:8100`
-or wherever the existing `server_app.py` is listening).
 
 ## Thresholds
 
@@ -55,45 +38,47 @@ Default mapping (configurable on the CLI):
 | Orange | 40 – 70 % |
 | Red    | < 40 %    |
 
-## Quick start — desky.local (LAN dashboard)
+## Deployment (pignus)
 
-```bash
-git clone <this repo> ~/soc_traffic_light
-cd ~/soc_traffic_light
-sudo bash install.sh
+The live instance runs on pignus from `~/soc_traffic_light` as `soc-traffic-light.service`:
+
+```
+venv/bin/python app.py --host 0.0.0.0 --port 8765 --upstream http://localhost:8100 \
+    --green-min 70 --orange-min 40 --site-name "Wombat Hollow Microgrid"
 ```
 
-That installs a venv, sets up `soc-traffic-light.service` pointing at
-`http://rubberduck.local:5000`, and starts it.
-
-Browse: `http://desky.local:8080/`
-
-## Quick start — pignus.arachnoid.net.au (internet mirror)
-
-On pignus the existing `server_app.py` already runs on `:8100`, so just
-point this app at localhost:
+To deploy a change:
 
 ```bash
-git clone <this repo> ~/soc_traffic_light
-cd ~/soc_traffic_light
-sudo bash install.sh --upstream http://localhost:8100 --port 8080
+git push
+ssh pignus 'cd ~/soc_traffic_light && git pull --ff-only && sudo systemctl restart soc-traffic-light.service'
 ```
 
-Then either browse directly to `http://pignus.arachnoid.net.au:8080/`,
-or — recommended — reverse-proxy it behind your existing Apache vhost
-(see *Apache vhost snippet* below).
+Restart even after template-only changes, because Flask caches templates. drongo picks up
+kiosk changes on the page's 15-minute self-reload.
+
+To install from scratch (on pignus, or another host pointing at a different upstream):
+
+```bash
+git clone https://github.com/glenmo/soc_traffic_light.git ~/soc_traffic_light
+cd ~/soc_traffic_light
+sudo bash install.sh --upstream http://localhost:8100 --port 8765 --site-name "Wombat Hollow Microgrid"
+```
+
+desky also runs an old LAN copy (`--upstream http://rubberduck.local:5000`, port 8765) that is
+still at the initial commit and isn't updated by the steps above.
 
 ## CLI options
 
 ```
 --host           Flask listen address              (default: 0.0.0.0)
---port           Flask listen port                 (default: 8080)
+--port           Flask listen port                 (default: 8080; pignus uses 8765)
 --upstream       URL of microgrid_remote_monitor   (default: http://rubberduck.local:5000)
 --poll-interval  Seconds between upstream fetches  (default: 5)
 --request-timeout HTTP timeout per upstream call   (default: 4)
 --green-min      SOC %% at which light goes green  (default: 70)
 --orange-min     SOC %% at which light goes orange (default: 40)
---site-name      Heading text                      (default: Mooramoora)
+--site-name      Heading text                      (default: Wombat Hollow Microgrid)
 --debug          Flask debug mode
 ```
 
@@ -106,30 +91,37 @@ or — recommended — reverse-proxy it behind your existing Apache vhost
 3. Writes `/etc/systemd/system/soc-traffic-light.service`
 4. Enables + starts it
 
+Its own defaults are `--port 8080`, `--upstream http://rubberduck.local:5000` and
+`--site-name Mooramoora`, so pass the pignus values shown above.
+
 ```
 sudo bash install.sh \
     --upstream http://localhost:8100 \
-    --port 8080 \
+    --port 8765 \
     --green-min 70 \
     --orange-min 40 \
-    --site-name Mooramoora
+    --site-name "Wombat Hollow Microgrid"
 ```
 
-## API
+## Routes
 
-| Endpoint     | Description                                          |
-| ------------ | ---------------------------------------------------- |
-| `GET /`      | Traffic-light dashboard (HTML)                       |
-| `GET /api/soc` | JSON: per-device SOC, status, power, timestamps    |
-| `GET /healthz` | Liveness probe — 200 OK if either inverter is reporting |
+| App route | Public URL | Description |
+| --------- | ---------- | ----------- |
+| `GET /` | `/basic/` | Traffic-light page (HTML) |
+| `GET /home` | `/` | Public front page: tiles of the kiosk screens |
+| `GET /kiosk` | `/kiosk` | Lodge kiosk for drongo's 1920x1080 screen |
+| `GET /mesh`, `GET /mesh/data` | same | MooraMoora mesh messages; 404 without `?k=<token>` |
+| `GET /api/soc` | same | JSON: per-device SOC, status, power, timestamps |
+| `GET /api/extras` | same | JSON: forecast, fire danger, events, kiosk message |
+| `GET /healthz` | same | Liveness probe: 200 OK if either inverter is reporting |
 
 Example `/api/soc` response:
 
 ```json
 {
-  "site": "Mooramoora",
+  "site": "Wombat Hollow Microgrid",
   "thresholds": { "green_min": 70, "orange_min": 40 },
-  "upstream": "http://rubberduck.local:5000",
+  "upstream": "http://localhost:8100",
   "server_time": "2026-05-15T08:42:11.123456+00:00",
   "devices": {
     "sppro": {
@@ -147,23 +139,36 @@ Example `/api/soc` response:
 }
 ```
 
-## Apache vhost snippet (pignus)
+## Apache (pignus)
 
-To serve the traffic light on the same hostname as your existing dashboard:
+The app is served from `/etc/apache2/sites-available/monitor.mooramoora.org.au.conf`. The parts
+that reach it, in config order:
 
 ```apache
-<VirtualHost *:443>
-    ServerName pignus.arachnoid.net.au
+# This app's API endpoints, above the /api/ catch-all that goes to server_app.py on :8100
+ProxyPass        /api/soc    http://127.0.0.1:8765/api/soc
+ProxyPass        /api/extras http://127.0.0.1:8765/api/extras
+ProxyPass        /healthz    http://127.0.0.1:8765/healthz
+ProxyPass        /api/       http://127.0.0.1:8100/api/
 
-    # ... your existing SSL / log / etc. config ...
+# ... other apps (/advanced/, /ev/, /comfort/, /hotwater/, /weather/, ...) and the
+# password-protected /overview/ tile page (see the noisy-index repo) ...
 
-    # Traffic-light page at /soc/
-    ProxyPass        /soc/  http://127.0.0.1:8080/
-    ProxyPassReverse /soc/  http://127.0.0.1:8080/
-</VirtualHost>
+# Public front page at exactly /. The empty () is needed: a ProxyPassMatch target with
+# no backreference gets the request path appended, so / would become /home/ (a 404).
+ProxyPassMatch   ^/()$ http://127.0.0.1:8765/home$1
+
+# Traffic light page at /basic/, then the catch-all (/kiosk, /mesh, /mesh/data, ...)
+RewriteRule ^/basic$ /basic/ [R=301,L]
+ProxyPass        /basic/     http://127.0.0.1:8765/
+ProxyPassReverse /basic/     http://127.0.0.1:8765/
+ProxyPass        /           http://127.0.0.1:8765/
+ProxyPassReverse /           http://127.0.0.1:8765/
 ```
 
-After this, `https://pignus.arachnoid.net.au/soc/` shows the lights.
+Because `/api/` belongs to :8100, new data endpoints for this app need a path outside `/api/`
+(like `/mesh/data`) or their own `ProxyPass` above the `/api/` line. Back up the vhost before
+editing it, and run `sudo apache2ctl configtest` before `sudo systemctl reload apache2`.
 
 ## Front-end behaviour
 

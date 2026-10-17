@@ -25,10 +25,12 @@ import os
 import re
 import threading
 import time
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import xml.etree.ElementTree as ET
 
+import icalendar
+import recurring_ical_events
 import requests
 
 log = logging.getLogger("extras")
@@ -38,6 +40,11 @@ TZ = "Australia/Melbourne"
 # Pretty /wp-json/ permalinks 404 on this site; ?rest_route= works.
 WP_BASE = "https://mooramoora.org.au/"
 WP_EVENTS_ROUTE = "/wp/v2/eventbrite_events"   # Import Eventbrite Events plugin
+# Learning Centre Google Calendar: Lodge and Octagon bookings (shared to the co-op list
+# by Bec Urie, 2026-10-18). Public ICS feed of mooramooralearningcentre@gmail.com.
+LC_CALENDAR_ICS = ("https://calendar.google.com/calendar/ical/"
+                   "mooramooralearningcentre%40gmail.com/public/basic.ics")
+CALENDAR_DAYS = 60                   # how far ahead the kiosk lists bookings
 # CFA district feed: BOM fire danger rating + Total Fire Ban, today and 3-4 days out.
 CFA_RSS = "https://www.cfa.vic.gov.au/cfa/rssfeed/central-firedistrict_rss.xml"
 FIRE_DISTRICT = "Central"
@@ -63,9 +70,10 @@ def day_code(code, rain_pct, rain_mm, cloud):
 class Extras:
     def __init__(self):
         self._lock = threading.Lock()
-        self._data = {"forecast": None, "fire": None, "events": None}
-        self._stamp = {"forecast": None, "fire": None, "events": None}
-        self._err = {"forecast": None, "fire": None, "events": None}
+        names = ("forecast", "fire", "events", "calendar")
+        self._data = dict.fromkeys(names)
+        self._stamp = dict.fromkeys(names)
+        self._err = dict.fromkeys(names)
 
     def start(self):
         t = threading.Thread(target=self._loop, daemon=True, name="extras")
@@ -85,7 +93,8 @@ class Extras:
     def _loop(self):
         sources = (("forecast", self.fetch_forecast),
                    ("fire", self.fetch_fire),
-                   ("events", self.fetch_events))
+                   ("events", self.fetch_events),
+                   ("calendar", self.fetch_calendar))
         due = {name: 0.0 for name, _ in sources}
         while True:
             for name, fn in sources:
@@ -184,6 +193,31 @@ class Extras:
         out.sort(key=lambda e: (e["start"] is None, e["start"] or ""))
         return out
 
+    # ---- calendar: Learning Centre bookings, public Google Calendar ICS ----
+    def fetch_calendar(self):
+        r = requests.get(LC_CALENDAR_ICS, timeout=15, headers=UA)
+        r.raise_for_status()
+        cal = icalendar.Calendar.from_ical(r.content)
+        tz = ZoneInfo(TZ)
+        now = datetime.now(tz)
+        out = []
+        # between() expands recurring events and includes ones already under way.
+        for ev in recurring_ical_events.of(cal).between(now, now + timedelta(days=CALENDAR_DAYS)):
+            title = " ".join(str(ev.get("SUMMARY", "")).split())
+            if not title or str(ev.get("CLASS", "PUBLIC")).upper() != "PUBLIC":
+                continue
+            start = ev["DTSTART"].dt
+            end = ev["DTEND"].dt if ev.get("DTEND") else start
+            all_day = not isinstance(start, datetime)
+            if all_day:
+                end = max(start, end - timedelta(days=1))    # DTEND is exclusive
+                start, end = start.isoformat(), end.isoformat()
+            else:
+                start, end = start.astimezone(tz).isoformat(), end.astimezone(tz).isoformat()
+            out.append({"title": title, "start": start, "end": end, "all_day": all_day})
+        out.sort(key=lambda e: e["start"])
+        return out
+
     def _event_date(self, p):
         cache = self.__dict__.setdefault("_event_dates", {})
         key = (p.get("id"), p.get("modified"))
@@ -234,7 +268,7 @@ def _parse_event_date(page_html, published):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     x = Extras()
-    for fn in (x.fetch_forecast, x.fetch_fire, x.fetch_events):
+    for fn in (x.fetch_forecast, x.fetch_fire, x.fetch_events, x.fetch_calendar):
         try:
             print(fn.__name__, json.dumps(fn(), indent=1)[:600])
         except Exception as e:

@@ -2,3 +2,5 @@ flask>=3.0
 requests>=2.31
 paho-mqtt>=2.0
 cryptography>=41
+icalendar>=6.0
+recurring-ical-events>=3.0

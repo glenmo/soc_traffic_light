@@ -131,7 +131,15 @@
   /* --- events --- */
   .ev-head { justify-content:space-between; }
   .ev-head img { height:48px; }
-  .events { flex:1; display:flex; flex-direction:column; gap:10px; min-height:0; }
+  .events { flex:1; min-height:0; overflow:hidden; }
+  .ev-copy { display:flex; flex-direction:column; gap:10px; }
+  /* Longer than the tile: scroll up through the list on a loop. The list is doubled
+     (second copy aria-hidden), so -50% lands back on the start. */
+  .ev-track.scroll { animation:ev-scroll var(--ev-dur, 30s) linear infinite; }
+  .ev-track.scroll .ev-copy { padding-top:10px; }
+  @keyframes ev-scroll { 0%, 6% { transform:translateY(0); } 100% { transform:translateY(-50%); } }
+  .events:has(.scroll) { mask-image:linear-gradient(transparent, #000 14px, #000 calc(100% - 14px), transparent); }
+  @media (prefers-reduced-motion: reduce) { .ev-track.scroll { animation:none; } }
   .event { display:flex; align-items:center; gap:16px; }
   .cal { width:58px; flex:none; border-radius:8px; overflow:hidden; text-align:center; background:var(--card2); }
   .cal .m { background:var(--red); color:#fff; font-size:13px; font-weight:700; letter-spacing:1px; padding:2px 0; }
@@ -680,17 +688,54 @@ async function pollExtras(){
         + (p[1].tfb ? " · Total Fire Ban" : "") : "";
       drawGauge(t.rating);
     }
-    if (s.events.data){
-      $("events").innerHTML = s.events.data.slice(0,3).map(e=>{
-        const d = e.start ? new Date(e.start.length === 10 ? e.start+"T12:00:00" : e.start) : null;
-        const cal = d ? `<div class="cal"><div class="m">${d.toLocaleDateString("en-AU",{month:"short"}).toUpperCase()}</div><div class="d">${d.getDate()}</div></div>`
-                      : `<div class="cal"><div class="m">TBA</div><div class="d">?</div></div>`;
-        const when = d ? d.toLocaleDateString("en-AU",{weekday:"long"}) : "";
-        return `<div class="event">${cal}<div><div class="title">${esc(e.title)}</div><div class="when">${when}</div></div></div>`;
-      }).join("") || '<div class="sub">No events listed</div>';
-    }
-    stale("fc-card","forecast"); stale("fire-card","fire"); stale("events-card","events");
+    if (s.events.data || s.calendar.data) renderEvents([...(s.events.data||[]), ...(s.calendar.data||[])]);
+    stale("fc-card","forecast"); stale("fire-card","fire"); $("events-card").classList.toggle("stale", !!(s.events.error || s.calendar.error));
   } catch(e){ console.warn(e); }
+}
+
+// "Coming up": Eventbrite events (date only) merged with Learning Centre calendar bookings
+// (start/end, timed or all-day). Dates are shown in Melbourne time whoever is viewing.
+const LODGE_TZ = "Australia/Melbourne";
+const evDate = iso => new Date(iso.length === 10 ? iso + "T12:00:00+10:00" : iso);
+const evFmt = (d, o) => d.toLocaleString("en-AU", {timeZone:LODGE_TZ, ...o});
+const evDay = d => evFmt(d, {year:"numeric", month:"2-digit", day:"2-digit"});
+const evTime = d => evFmt(d, {hour:"numeric", minute:"2-digit"}).replace(":00", "").replace(/\s/g, "");
+function renderEvents(list){
+  const now = new Date();
+  const rows = list.filter(e => !e.end || evDate(e.end) > now || (e.all_day && e.end >= todayIso()))
+                   .sort((a, b) => (a.start == null) - (b.start == null) || (evDate(a.start||"9999-12-31") - evDate(b.start||"9999-12-31")))
+                   .slice(0, 20);
+  const html = rows.map(e=>{
+    if (!e.start) return `<div class="event"><div class="cal"><div class="m">TBA</div><div class="d">?</div></div><div><div class="title">${esc(e.title)}</div></div></div>`;
+    const d = evDate(e.start), end = e.end ? evDate(e.end) : d;
+    const timed = e.end && !e.all_day, multi = evDay(d) !== evDay(end);
+    const ongoing = d < now && multi;
+    const shown = ongoing ? end : d;
+    const cal = `<div class="cal"><div class="m">${ongoing ? "TIL " : ""}${evFmt(shown,{month:"short"}).toUpperCase()}</div><div class="d">${evFmt(shown,{day:"numeric"})}</div></div>`;
+    const short = x => evFmt(x, {weekday:"short", day:"numeric", month:"short"});
+    let when;
+    if (ongoing) when = "On now · until " + short(end);
+    else if (multi) when = short(d) + (timed ? " " + evTime(d) : "") + " – " + short(end);
+    else when = evFmt(d, {weekday:"long"}) + (timed ? " · " + evTime(d) + "–" + evTime(end) : "");
+    return `<div class="event">${cal}<div><div class="title">${esc(e.title)}</div><div class="when">${when}</div></div></div>`;
+  }).join("") || '<div class="sub">No events listed</div>';
+  const box = $("events");
+  if (box.dataset.html === html) return;          // keep the scroll running between polls
+  box.dataset.html = html;
+  box.innerHTML = `<div class="ev-track"><div class="ev-copy">${html}</div></div>`;
+  fitEvents();
+}
+// Scroll only when the list doesn't fit (never in the scrolling phone layout), ~30 px/s.
+function fitEvents(){
+  const box = $("events"), track = box.firstElementChild;
+  if (!track) return;
+  track.classList.remove("scroll"); track.querySelector(".ev-copy + .ev-copy")?.remove();
+  const first = track.firstElementChild;
+  if (MOBILE.matches || first.offsetHeight <= box.clientHeight) return;
+  const copy = first.cloneNode(true); copy.setAttribute("aria-hidden", "true");
+  track.append(copy);
+  track.style.setProperty("--ev-dur", Math.round(first.offsetHeight / 30) + "s");
+  track.classList.add("scroll");
 }
 
 // Keep the 1920x1080 kiosk layout on any landscape screen by scaling it; the
@@ -703,7 +748,7 @@ function fitKiosk(){
   b.classList.add("fit");
   b.style.transform = `translate(${(innerWidth-1920*s)/2}px, ${(innerHeight-1080*s)/2}px) scale(${s})`;
 }
-addEventListener("resize", fitKiosk); fitKiosk();
+addEventListener("resize", ()=>{ fitKiosk(); fitEvents(); }); fitKiosk();
 
 // Landscape (kiosk) screens rotate every 30 s: this page, /weather/ (weather_monitor in
 // microgrid_remote_monitor), /basic/ (battery state of charge), then /mesh when the URL carries

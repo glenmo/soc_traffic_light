@@ -310,7 +310,7 @@ def api_extras():
 
 
 def _mesh_allowed():
-    """/mesh is only for viewers listed in mesh_token.txt (drongo, and people given a token)."""
+    """/mesh is only for viewers listed in mesh_token.txt (bongo, and people given a token)."""
     return token_viewer(request.args.get("k", "")) is not None
 
 
@@ -339,7 +339,7 @@ def home():
 @app.route("/kiosk")
 @app.route("/kiosk/")
 def kiosk():
-    """Lodge kiosk page for drongo's 1920x1080 screen."""
+    """Lodge kiosk page for the Lodge kitchen kiosk's 1920x1080 screen (bongo)."""
     return render_template("kiosk.html")
 
 

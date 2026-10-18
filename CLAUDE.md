@@ -10,13 +10,13 @@ A small Flask app (`app.py`, plus `extras.py` and `mesh.py`) behind most of the 
 |---|---|---|---|
 | `/` | `index.html` | Traffic-light guide | `/basic/` |
 | `/home` | `home.html` | Tiles of the public kiosk screens, live scaled previews | `/` (exact) |
-| `/kiosk` | `kiosk.html` | Lodge kiosk, 1920x1080, shown full-screen on drongo | `/kiosk` |
+| `/kiosk` | `kiosk.html` | Lodge kiosk, 1920x1080, shown full-screen on bongo (Lodge kitchen; replaced drongo 2026-10-18) | `/kiosk` |
 | `/mesh`, `/mesh/data` | `mesh.html` | MooraMoora Meshtastic messages, token-only (404 without `?k=`) | `/mesh?k=<token>` |
 | `/api/soc`, `/api/extras`, `/healthz` | | JSON for the pages | same paths |
 
 - `extras.py` fetches the forecast (Open-Meteo), CFA fire danger, Moora Moora events (WordPress/Eventbrite) and the Learning Centre bookings calendar (public Google Calendar ICS of mooramooralearningcentre@gmail.com, expanded with `recurring_ical_events`) in a background thread. The kiosk merges events and bookings into "Coming up", which scrolls when the list is longer than the tile, and reads the kiosk header message from `kiosk_message.txt`. `day_code()` picks the forecast icon. The same rule is copied in `microgrid_remote_monitor/weather_monitor/app.py`, so change both together.
 - `mesh.py` subscribes to the MooraMoora channel on `mqtt.meshtastic.org` and decrypts it with `mesh_psk.txt`. Viewer tokens live in `mesh_token.txt`, which is re-read on every request. A Werkzeug log filter redacts `?k=` tokens, so don't log full request URLs elsewhere.
-- `kiosk.html` also reads other apps on the same host: `/ev/…`, `/hotwater/api/state`, `/comfort/api/current` (the heater tiles) and `/api/solis|sppro/data`. It only works fully behind pignus's Apache. On drongo, `cycleViews()` rotates it every 30 s through `/weather/`, `/basic/` and `/mesh`. When framed (the `/home` previews) it skips the rotation.
+- `kiosk.html` also reads other apps on the same host: `/ev/…`, `/hotwater/api/state`, `/comfort/api/current` (the heater tiles) and `/api/solis|sppro/data`. It only works fully behind pignus's Apache. On bongo, `cycleViews()` rotates it every 30 s through `/weather/`, `/basic/` and `/mesh`. When framed (the `/home` previews) it skips the rotation.
 
 ## Deploying
 
@@ -27,7 +27,7 @@ git push
 ssh pignus 'cd ~/soc_traffic_light && git pull --ff-only && sudo systemctl restart soc-traffic-light.service'
 ```
 
-Restart even for template-only changes, because Flask caches templates. drongo picks up kiosk changes on the page's 15-minute self-reload (repo `drongo-kiosk` covers restarting its Chromium sooner). desky also runs a LAN copy in `~/soc_traffic_light` (port 8765, upstream `rubberduck.local:5000`). Update it with `git pull` there, plus `venv/bin/pip install -r requirements.txt` if the requirements changed. `glen` has no passwordless sudo on desky, but the unit runs as `glen` with `Restart=always`, so `kill $(systemctl show -p MainPID --value soc-traffic-light.service)` restarts it. `/kiosk` there lacks the EV, hot water and heater data, because those come from other apps behind pignus's Apache.
+Restart even for template-only changes, because Flask caches templates. bongo picks up kiosk changes on the page's 15-minute self-reload (repo `drongo-kiosk` covers restarting its Chromium sooner). desky also runs a LAN copy in `~/soc_traffic_light` (port 8765, upstream `rubberduck.local:5000`). Update it with `git pull` there, plus `venv/bin/pip install -r requirements.txt` if the requirements changed. `glen` has no passwordless sudo on desky, but the unit runs as `glen` with `Restart=always`, so `kill $(systemctl show -p MainPID --value soc-traffic-light.service)` restarts it. `/kiosk` there lacks the EV, hot water and heater data, because those come from other apps behind pignus's Apache.
 
 ## Testing
 

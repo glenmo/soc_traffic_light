@@ -25,7 +25,7 @@ a traffic light.
    soc_traffic_light/app.py on pignus :8765
             │
             ▼
-   Apache, monitor.mooramoora.org.au  →  browsers, drongo's kiosk screen
+   Apache, monitor.mooramoora.org.au  →  browsers, bongo's kiosk screen (Lodge kitchen)
 ```
 
 ## Thresholds
@@ -54,7 +54,7 @@ git push
 ssh pignus 'cd ~/soc_traffic_light && git pull --ff-only && sudo systemctl restart soc-traffic-light.service'
 ```
 
-Restart even after template-only changes, because Flask caches templates. drongo picks up
+Restart even after template-only changes, because Flask caches templates. bongo picks up
 kiosk changes on the page's 15-minute self-reload.
 
 To install from scratch (on pignus, or another host pointing at a different upstream):
@@ -117,7 +117,7 @@ sudo bash install.sh \
 | --------- | ---------- | ----------- |
 | `GET /` | `/basic/` | Traffic-light page (HTML) |
 | `GET /home` | `/` | Public front page: tiles of the kiosk screens |
-| `GET /kiosk` | `/kiosk` | Lodge kiosk for drongo's 1920x1080 screen |
+| `GET /kiosk` | `/kiosk` | Lodge kiosk for the Lodge kitchen kiosk's 1920x1080 screen (bongo) |
 | `GET /mesh`, `GET /mesh/data` | same | MooraMoora mesh messages; 404 without `?k=<token>` |
 | `GET /api/soc` | same | JSON: per-device SOC, status, power, timestamps |
 | `GET /api/extras` | same | JSON: forecast, fire danger, events, kiosk message |
@@ -200,7 +200,7 @@ rotation. The password-protected tile page of every web app on pignus (web-index
 
 ## Lodge kiosk: MooraMoora mesh page
 
-On drongo the `/kiosk` page rotates every 30 s through four views: the kiosk,
+On bongo (the Lodge kitchen kiosk) the `/kiosk` page rotates every 30 s through four views: the kiosk,
 `/weather/` (the Lodge weather page: SMA Meteostation readings, a 24 h trend and a 7-day forecast,
 served by `weather_monitor` in the microgrid_remote_monitor repo), `/basic/` (the Wombat Hollow
 Microgrid battery state of charge page), and `/mesh`, which lists recent
@@ -218,11 +218,11 @@ Two files next to `app.py` configure it. Both are git-ignored and should be mode
 | File | Contents |
 |---|---|
 | `mesh_psk.txt` | The channel key in base64, as in the channel URL. Without it the feed is off. |
-| `mesh_token.txt` | One viewer per line, `<name> <token>` (e.g. `drongo …`, `glen …`). `/mesh` and `/mesh/data` answer only with `?k=<token>` and return 404 otherwise, including when this file is missing. It is re-read on every request, so add or delete a line to grant or revoke access without a restart. |
+| `mesh_token.txt` | One viewer per line, `<name> <token>` (e.g. `bongo …`, `glen …`). `/mesh` and `/mesh/data` answer only with `?k=<token>` and return 404 otherwise, including when this file is missing. It is re-read on every request, so add or delete a line to grant or revoke access without a restart. |
 
 The data endpoint is `/mesh/data`, not under `/api/`: pignus's Apache sends `/api/` to the advanced dashboard on port 8100.
 
-drongo opens `/kiosk?mesh=<token>`; its `autostart` reads the token from `~/.config/kiosk-mesh-token`.
+bongo opens `/kiosk?mesh=<token>`; its `autostart` reads the token from `~/.config/kiosk-mesh-token`.
 Anyone else with a token opens `/mesh?k=<token>` directly; on a phone the page switches to a scrolling layout.
 Tests: `venv/bin/python -m pytest tests/test_mesh.py`.
 

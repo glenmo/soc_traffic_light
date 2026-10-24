@@ -750,11 +750,11 @@ function fitKiosk(){
 }
 addEventListener("resize", ()=>{ fitKiosk(); fitEvents(); }); fitKiosk();
 
-// Landscape (kiosk) screens rotate every 30 s: this page, /weather/ (weather_monitor in
+// Landscape (kiosk) screens rotate every 15 s: this page, /weather/ (weather_monitor in
 // microgrid_remote_monitor), /basic/ (battery state of charge), then /mesh when the URL carries
 // bongo's ?mesh=<token>. The / page is password-protected now, so it's left out. Views stay loaded
 // in iframes so they keep polling.
-const VIEW_MS = 30000;
+const VIEW_MS = 15000;
 function cycleViews(){
   const views = [["/weather/", "Lodge weather"], ["/basic/", "Battery state of charge"]];
   const meshKey = new URLSearchParams(location.search).get("mesh");

@@ -16,7 +16,7 @@ A small Flask app (`app.py`, plus `extras.py` and `mesh.py`) behind most of the 
 
 - `extras.py` fetches the forecast (Open-Meteo), CFA fire danger, Moora Moora events (WordPress/Eventbrite) and the Learning Centre bookings calendar (public Google Calendar ICS of mooramooralearningcentre@gmail.com, expanded with `recurring_ical_events`) in a background thread. The kiosk merges events and bookings into "Coming up", which scrolls when the list is longer than the tile, and reads the kiosk header message from `kiosk_message.txt`. `day_code()` picks the forecast icon. The same rule is copied in `microgrid_remote_monitor/weather_monitor/app.py`, so change both together.
 - `mesh.py` subscribes to the MooraMoora channel on `mqtt.meshtastic.org` and decrypts it with `mesh_psk.txt`. Viewer tokens live in `mesh_token.txt`, which is re-read on every request. A Werkzeug log filter redacts `?k=` tokens, so don't log full request URLs elsewhere.
-- `kiosk.html` also reads other apps on the same host: `/ev/…`, `/hotwater/api/state`, `/comfort/api/current` (the heater tiles) and `/api/solis|sppro/data`. It only works fully behind pignus's Apache. On bongo, `cycleViews()` rotates it every 30 s through `/weather/`, `/basic/` and `/mesh`. When framed (the `/home` previews) it skips the rotation.
+- `kiosk.html` also reads other apps on the same host: `/ev/…`, `/hotwater/api/state`, `/comfort/api/current` (the heater tiles) and `/api/solis|sppro/data`. It only works fully behind pignus's Apache. On bongo, `cycleViews()` rotates it every 15 s through `/weather/`, `/basic/` and `/mesh`. When framed (the `/home` previews) it skips the rotation.
 
 ## Deploying
 

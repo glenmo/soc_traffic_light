@@ -200,7 +200,7 @@ rotation. The password-protected tile page of every web app on pignus (web-index
 
 ## Lodge kiosk: MooraMoora mesh page
 
-On bongo (the Lodge kitchen kiosk) the `/kiosk` page rotates every 30 s through four views: the kiosk,
+On bongo (the Lodge kitchen kiosk) the `/kiosk` page rotates every 15 s through four views: the kiosk,
 `/weather/` (the Lodge weather page: SMA Meteostation readings, a 24 h trend and a 7-day forecast,
 served by `weather_monitor` in the microgrid_remote_monitor repo), `/basic/` (the Wombat Hollow
 Microgrid battery state of charge page), and `/mesh`, which lists recent

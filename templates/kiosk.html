@@ -157,10 +157,16 @@
   .view { position:absolute; inset:0; width:100%; height:100%; border:0; background:var(--bg);
           opacity:0; pointer-events:none; transition:opacity .8s; z-index:10; }
   .view.show { opacity:1; }
+  /* Time left until the next view, across the bottom of every view (sits above the iframes). */
+  #viewbar { position:absolute; left:0; bottom:0; height:6px; width:100%; background:var(--blue);
+             opacity:.7; transform-origin:0 50%; transform:scaleX(0); z-index:11; pointer-events:none; }
+  #viewbar.run { animation:viewbar linear forwards; }
+  @keyframes viewbar { from { transform:scaleX(0); } to { transform:scaleX(1); } }
 
   /* --- phones, narrow windows and portrait tablets: scrolling single column --- */
   @media (max-width: 900px), (orientation: portrait) {
     html, body { height:auto; overflow:auto; }
+    #viewbar { display:none; }
     body { display:block; padding:12px; }
     header { flex-wrap:wrap; font-size:22px; padding-bottom:8px; margin-bottom:12px; gap:4px 12px; }
     header .msg { order:3; flex-basis:100%; margin:0; font-size:16px; white-space:normal; text-align:left; }
@@ -765,10 +771,16 @@ function cycleViews(){
     document.body.appendChild(f);
     return f;
   });
+  const bar = document.createElement("div");
+  bar.id = "viewbar"; bar.style.animationDuration = VIEW_MS + "ms";
+  document.body.appendChild(bar);
+  const restartBar = () => { bar.classList.remove("run"); void bar.offsetWidth; bar.classList.add("run"); };
+  restartBar();
   let i = 0;  // 0 = this page, 1.. = frames
   setInterval(() => {
     i = (i + 1) % (frames.length + 1);
     frames.forEach((f, n) => f.classList.toggle("show", !MOBILE.matches && n === i - 1));
+    restartBar();
   }, VIEW_MS);
 }
 // Not when framed (the tile previews on the / page): there it shows just the kiosk itself.
